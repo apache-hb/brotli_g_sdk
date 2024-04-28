@@ -38,7 +38,8 @@ shader = files('src/decoder/BrotliGCompute.hlsl')
 libbrotlig = library('brotli_g_sdk', src,
     include_directories : inc,
     dependencies : [ common, encode, decode ],
-    extra_files : shader
+    extra_files : shader,
+    override_options : [ 'unity=off' ]
 )
 
 brotlig_dep = declare_dependency(
@@ -58,7 +59,8 @@ if build_sample.allowed()
 
     executable('brotli_g_sample', 'sample/brotlig_cli.cpp', 'sample/BrotligGPUDecoder.cpp', fs.copyfile(shader),
         dependencies : [ brotlig_dep, d3dx12, dxcompiler, d3d12, dxgi, dxguid ],
-        cpp_args : [ '-DUSE_BROTLI_CODEC', '-DUSE_GPU_DECOMPRESSION' ]
+        cpp_args : [ '-DUSE_BROTLI_CODEC', '-DUSE_GPU_DECOMPRESSION' ],
+        override_options : [ 'unity=off' ]
     )
 endif
 
