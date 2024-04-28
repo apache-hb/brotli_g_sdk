@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1 Sample
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -34,9 +34,9 @@
 #endif
 
 #ifdef USE_BROTLI_CODEC
-#include "brotli/c/common/constants.h"
-#include "brotli/encode.h"
-#include "brotli/decode.h"
+#include "c/common/constants.h"
+#include "encode.h"
+#include "decode.h"
 #endif
 
 #define GIGABYTES   (1024.0 * 1024.0 * 1024.0)
@@ -51,7 +51,7 @@
 #define DEFAULT_BROTLI_DECODE_OUTPUT_SIZE 256 * 1024 * 1024
 #endif
 
-typedef struct BROTLIG_OPTIONS_T {
+struct BrotligCliOptions {
     uint32_t page_size;                             // page size for compressing the source file
     uint32_t num_repeat;                            // number of times to repeat the task
     bool use_preconditioning;                       // use format-based preconditioning
@@ -78,7 +78,7 @@ typedef struct BROTLIG_OPTIONS_T {
 
     bool verbose;                                   // print process status on console output, this will slow down performance
 
-    BROTLIG_OPTIONS_T()
+    BrotligCliOptions()
     {
         page_size = BROTLIG_DEFAULT_PAGE_SIZE;
         num_repeat = 1;
@@ -109,13 +109,13 @@ typedef struct BROTLIG_OPTIONS_T {
 
         verbose = FALSE;
     }
-} BROTLIG_OPTIONS;
+};
 
 // check if a file extension exists
 inline bool EndsWith(const char* s, const char* subS)
 {
-    uint32_t sLen = (uint32_t)strlen(s);
-    uint32_t subSLen = (uint32_t)strlen(subS);
+    auto sLen = strlen(s);
+    auto subSLen = strlen(subS);
     if (sLen >= subSLen)
     {
         return strcmp(s + (sLen - subSLen), subS) == 0;
@@ -126,7 +126,7 @@ inline bool EndsWith(const char* s, const char* subS)
 // Remove a file extension
 inline void RemoveExtension(std::string& srcString, const std::string& extension)
 {
-    uint32_t pos = (uint32_t)srcString.find(extension);
+    auto pos = srcString.find(extension);
     if (pos != std::string::npos)
         srcString.erase(pos, extension.length());
 }
@@ -221,7 +221,7 @@ void PrintCommandLineSyntax()
     , BROTLIG_DEFAULT_PAGE_SIZE, BROTLIG_MAX_PAGE_SIZE, BROTLIG_MIN_PAGE_SIZE);
 }
 
-void ParseCommandLine(int argCount, char* args[], std::string& srcFilePath, std::string& dstFilePath, BROTLIG_OPTIONS& params)
+void ParseCommandLine(int argCount, char* args[], std::string& srcFilePath, std::string& dstFilePath, BrotligCliOptions& params)
 {
     int i = 0;
 
@@ -280,7 +280,7 @@ void ParseCommandLine(int argCount, char* args[], std::string& srcFilePath, std:
 #endif
 #ifdef USE_BROTLI_CODEC
         else if (strcmp(args[i], "-brotli") == 0)
-        { 
+        {
             params.use_brotli = true;
         }
         else if (strcmp(args[i], "-brotli-quality") == 0)
@@ -333,7 +333,7 @@ bool keypressed()
     return false;
 }
 
-// user can overide this to direct status messages 
+// user can overide this to direct status messages
 // to a specific device output
 #define MAX_STATUS_STRING_BUFFER 4096
 void printStatus(const char* status, ...)
@@ -343,12 +343,12 @@ void printStatus(const char* status, ...)
     va_start(list, status);
     vsprintf_s(text, MAX_STATUS_STRING_BUFFER, status, list);
     va_end(list);
-    printf(text);
+    printf("%s", text);
 }
 
-// Called internally by the Encoder a % value ranging from 0.0% to 100% is passed in 
+// Called internally by the Encoder a % value ranging from 0.0% to 100% is passed in
 // Return true if processing needs to be aborted by the user
-// user can print out the processCompleted using printf or cout, 
+// user can print out the processCompleted using printf or cout,
 // doing so will slow down the encoding process
 bool processFeedback(BROTLIG_MESSAGE_TYPE mtype, std::string msg)
 {
@@ -376,8 +376,8 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        BROTLIG_OPTIONS pParams;
-        memset(&pParams, 0, sizeof(BROTLIG_OPTIONS));
+        BrotligCliOptions pParams;
+        memset(&pParams, 0, sizeof(BrotligCliOptions));
         pParams.page_size = BROTLIG_DEFAULT_PAGE_SIZE;
         pParams.num_repeat = DEFAULT_NUM_REPEAT;
 
@@ -400,7 +400,7 @@ int main(int argc, char* argv[])
         bool     isCompressed = false;
         double   compression_ratio = 0.0;
         double   bandwidth = 0.0;
-        char*    processMessage = "";
+        const char*    processMessage = "";
 
 #ifdef USE_BROTLI_CODEC
         if (pParams.use_brotli == false)
@@ -469,7 +469,7 @@ int main(int argc, char* argv[])
                         ++rep;
                     }
                 }
-                
+
                 printf("Saving decompressed file %s\n", dstFilePath.c_str());
                 if (!WriteBinaryFile(dstFilePath, output_data, output_size))
                     throw std::exception("File Not Saved.");
@@ -542,7 +542,7 @@ int main(int argc, char* argv[])
                 if (dstFilePath == "")
                 {
                     dstFilePath = srcFilePath;
-                    // remove the BROTLI_FILE_EXTENSION in dstFilePath 
+                    // remove the BROTLI_FILE_EXTENSION in dstFilePath
                     RemoveExtension(dstFilePath, BROTLI_FILE_EXTENSION);
                 }
 
@@ -635,7 +635,7 @@ int main(int argc, char* argv[])
         printf("Processed in      : %.0f ms\n", deltaTime);
         printf("Bandwidth         : %.6f GiB/s\n", bandwidth);
 
-        if (compression_ratio > 0.0f) 
+        if (compression_ratio > 0.0f)
             printf("Compression Ratio : %.2f\n", compression_ratio);
 
         if (output_data != nullptr)  delete[](output_data);

@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -21,13 +21,7 @@
 #pragma once
 
 #include <cassert>
-
-extern "C" {
-#include "brotli/c/common/platform.h"
-}
-
-#include "common/BrotligCommon.h"
-#include "common/BrotligConstants.h"
+#include <cstdint>
 
 namespace BrotliG
 {
@@ -79,7 +73,7 @@ namespace BrotliG
         {
             m_buf >>= n;
             m_bitcnt -= n;
-            
+
             if (m_bitcnt < minbitcnt)
             {
                 m_buf |= (uint64_t)Load() << (m_bitcnt);

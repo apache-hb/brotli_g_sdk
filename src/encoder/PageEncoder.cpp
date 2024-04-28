@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -24,13 +24,24 @@
 */
 
 
-extern "C" {
-#include "brotli/c/enc/utf8_util.h"
-#include "brotli/c/enc/backward_references_hq.h"
-#include "brotli/c/enc/cluster.h"
-}
+#include "c/common/transform.h"
 
-#include "common/BrotligUtils.h"
+#include "c/enc/command.h"
+#include "c/enc/hash.h"
+#include "c/enc/quality.h"
+#include "c/enc/metablock.h"
+
+#include "c/enc/utf8_util.h"
+#include "c/enc/backward_references_hq.h"
+#include "c/enc/cluster.h"
+#include "c/enc/entropy_encode.h"
+#include "c/enc/bit_cost.h"
+
+#include "brotli/encode.h"
+
+#include "BrotligSwizzler.h"
+#include "common/BrotligDataConditioner.h"
+
 #include "common/BrotligBitWriter.h"
 #include "common/BrotligDataConditioner.h"
 
@@ -124,7 +135,7 @@ static void BrotligCreateHqZopfliBackwardReferences(
     size_t endPos = 0, cmdIndex = 0;
     while (cmdIndex < state->num_commands_) {
         assert((state->commands_[cmdIndex].copy_len_ & 0x1FFFFFF) < input_size);
-        endPos += state->commands_[cmdIndex].insert_len_ + (state->commands_[cmdIndex++].copy_len_ & 0x1FFFFFF); 
+        endPos += state->commands_[cmdIndex].insert_len_ + (state->commands_[cmdIndex++].copy_len_ & 0x1FFFFFF);
     }
 
     if (endPos < input_size)
@@ -134,7 +145,7 @@ static void BrotligCreateHqZopfliBackwardReferences(
         Command extra = {};
         extra.insert_len_ = (uint32_t)litsLeft;
         extra.cmd_prefix_ = (uint16_t)(BROTLI_NUM_COMMAND_SYMBOLS) + GetInsertLengthCode(extra.insert_len_);
-    
+
         assert(extra.cmd_prefix_ < BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE);
 
         state->commands_[state->num_commands_++] = extra;
@@ -163,7 +174,6 @@ static bool BrotligComputeDistanceCost(const Command* cmds,
     BROTLI_BOOL equal_params = BROTLI_FALSE;
     uint16_t dist_prefix;
     uint32_t dist_extra;
-    double extra_bits = 0.0;
     HistogramDistance histo;
     HistogramClearDistance(&histo);
 
@@ -191,7 +201,6 @@ static bool BrotligComputeDistanceCost(const Command* cmds,
                     &dist_extra);
             }
             HistogramAddDistance(&histo, dist_prefix & 0x3FF);
-            extra_bits += dist_prefix >> 10;
         }
     }
 
@@ -224,6 +233,211 @@ static void BrotligRecomputeDistancePrefixes(
                 &cmd->dist_extra_);
         }
     }
+}
+
+BrotligEncoderParams::BrotligEncoderParams()
+{
+    mode = BROTLI_DEFAULT_MODE;
+    quality = BROTLI_DEFAULT_QUALITY;
+    lgwin = BROTLI_DEFAULT_WINDOW;
+
+    page_size = BROTLIG_DEFAULT_PAGE_SIZE;
+    num_bitstreams = BROLTIG_DEFAULT_NUM_BITSTREAMS;
+    cmd_group_size = BROTLIG_COMMAND_GROUP_SIZE;
+    swizzle_size = BROTLIG_SWIZZLE_SIZE;
+}
+
+BrotligEncoderParams::BrotligEncoderParams(
+    int quality,
+    int lgwin,
+    size_t p_size
+)
+{
+    this->mode = BROTLI_DEFAULT_MODE;
+    this->quality = quality;
+    this->lgwin = lgwin;
+    this->page_size = p_size;
+    this->num_bitstreams = BROLTIG_DEFAULT_NUM_BITSTREAMS;
+    this->cmd_group_size = BROTLIG_COMMAND_GROUP_SIZE;
+    this->swizzle_size = BROTLIG_SWIZZLE_SIZE;
+}
+
+BrotligEncoderParams& BrotligEncoderParams::operator=(const BrotligEncoderParams& other)
+{
+    this->mode = other.mode;
+    this->lgwin = other.lgwin;
+    this->quality = other.quality;
+    this->page_size = other.page_size;
+    this->num_bitstreams = other.num_bitstreams;
+    this->cmd_group_size = other.cmd_group_size;
+    this->swizzle_size = other.swizzle_size;
+
+    return *this;
+}
+
+BrotligEncoderState::BrotligEncoderState(brotli_alloc_func alloc_func, brotli_free_func free_func, void* opaque)
+{
+    BrotliInitMemoryManager(&memory_manager_, alloc_func, free_func, opaque);
+
+    params.mode = BROTLI_DEFAULT_MODE;
+    params.large_window = BROTLI_FALSE;
+    params.quality = BROTLI_DEFAULT_QUALITY;
+    params.lgwin = BROTLI_DEFAULT_WINDOW;
+    params.lgblock = 0;
+    params.stream_offset = 0;
+    params.size_hint = 0;
+    params.disable_literal_context_modeling = BROTLI_FALSE;
+    BrotliInitSharedEncoderDictionary(&params.dictionary);
+    params.dist.distance_postfix_bits = 0;
+    params.dist.num_direct_distance_codes = 0;
+    params.dist.alphabet_size_max =
+        BROTLI_DISTANCE_ALPHABET_SIZE(0, 0, BROTLI_MAX_DISTANCE_BITS);
+    params.dist.alphabet_size_limit = params.dist.alphabet_size_max;
+    params.dist.max_distance = BROTLI_MAX_DISTANCE;
+
+    input_pos_ = 0;
+    num_commands_ = 0;
+    num_literals_ = 0;
+    last_insert_len_ = 0;
+    HasherInit(&hasher_);
+    is_initialized_ = BROTLI_FALSE;
+
+    commands_ = 0;
+
+    /* Initialize distance cache. */
+    dist_cache_[0] = 4;
+    dist_cache_[1] = 11;
+    dist_cache_[2] = 15;
+    dist_cache_[3] = 16;
+}
+
+BrotligEncoderState::~BrotligEncoderState()
+{
+    MemoryManager* m = &memory_manager_;
+    if (BROTLI_IS_OOM(m))
+    {
+        BrotliWipeOutMemoryManager(m);
+        return;
+    }
+
+    BROTLI_FREE(m, commands_);
+    DestroyHasher(m, &hasher_);
+}
+
+static const uint16_t gStaticDictionaryHashWords[32768] = { 0 };
+static const uint8_t gStaticDictionaryHashLengths[32768] = { 0 };
+static const uint16_t gStaticDictionaryBuckets[32768] = { 0 };
+
+void BrotligEncoderState::BrotligInitEncoderDictionary(BrotliEncoderDictionary* dict)
+{
+    dict->words = BrotliGetDictionary();
+    dict->num_transforms = (uint32_t)BrotliGetTransforms()->num_transforms;
+
+    dict->hash_table_words = gStaticDictionaryHashWords;
+    dict->hash_table_lengths = gStaticDictionaryHashLengths;
+    dict->buckets = gStaticDictionaryBuckets;
+    dict->dict_words = kStaticDictionaryWords;
+
+    dict->cutoffTransformsCount = kCutoffTransformsCount;
+    dict->cutoffTransforms = kCutoffTransforms;
+}
+
+BROTLI_BOOL BrotligEncoderState::SetParameter(BrotliEncoderParameter p, uint32_t value)
+{
+    if (is_initialized_) return BROTLI_FALSE;
+    /* TODO: Validate/clamp parameters here. */
+    switch (p) {
+    case BROTLI_PARAM_MODE:
+        params.mode = (BrotliEncoderMode)value;
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_QUALITY:
+        params.quality = (int)value;
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_LGWIN:
+        params.lgwin = (int)value;
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_LGBLOCK:
+        params.lgblock = (int)value;
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_DISABLE_LITERAL_CONTEXT_MODELING:
+        if ((value != 0) && (value != 1)) return BROTLI_FALSE;
+        params.disable_literal_context_modeling = TO_BROTLI_BOOL(!!value);
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_SIZE_HINT:
+        params.size_hint = value;
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_LARGE_WINDOW:
+        params.large_window = TO_BROTLI_BOOL(!!value);
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_NPOSTFIX:
+        params.dist.distance_postfix_bits = value;
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_NDIRECT:
+        params.dist.num_direct_distance_codes = value;
+        return BROTLI_TRUE;
+
+    case BROTLI_PARAM_STREAM_OFFSET:
+        if (value > (1u << 30)) return BROTLI_FALSE;
+        params.stream_offset = value;
+        return BROTLI_TRUE;
+
+    default: return BROTLI_FALSE;
+    }
+}
+
+void BrotligEncoderState::BrotligChooseDistanceParams()
+{
+    uint32_t distance_postfix_bits = 0;
+    uint32_t num_direct_distance_codes = 0;
+
+    if (params.quality >= MIN_QUALITY_FOR_NONZERO_DISTANCE_PARAMS) {
+        uint32_t ndirect_msb;
+        if (params.mode == BROTLI_MODE_FONT) {
+            distance_postfix_bits = 1;
+            num_direct_distance_codes = 12;
+        }
+        else {
+            distance_postfix_bits = params.dist.distance_postfix_bits;
+            num_direct_distance_codes = params.dist.num_direct_distance_codes;
+        }
+        ndirect_msb = (num_direct_distance_codes >> distance_postfix_bits) & 0x0F;
+        if (distance_postfix_bits > BROTLI_MAX_NPOSTFIX ||
+            num_direct_distance_codes > BROTLI_MAX_NDIRECT ||
+            (ndirect_msb << distance_postfix_bits) != num_direct_distance_codes) {
+            distance_postfix_bits = 0;
+            num_direct_distance_codes = 0;
+        }
+    }
+
+    BrotliInitDistanceParams(
+        &params.dist, distance_postfix_bits, num_direct_distance_codes, params.large_window);
+}
+
+bool BrotligEncoderState::EnsureInitialized()
+{
+    if (BROTLI_IS_OOM(&memory_manager_)) return BROTLI_FALSE;
+    if (is_initialized_) return BROTLI_TRUE;
+
+    uint32_t tlgwin = BROTLI_MIN_WINDOW_BITS;
+    while (BROTLI_MAX_BACKWARD_LIMIT(tlgwin) < (uint64_t)params.size_hint - 16) {
+        tlgwin++;
+        if (tlgwin == BROTLI_MAX_WINDOW_BITS) break;
+    }
+    params.lgwin = tlgwin;
+
+    SanitizeParams(&params);
+    params.lgblock = ComputeLgBlock(&params);
+    BrotligChooseDistanceParams();
+
+    return BROTLI_TRUE;
 }
 
 PageEncoder::PageEncoder()
@@ -262,7 +476,7 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
         else
             delete[] pageCopy;
     }
-    
+
     uint8_t* p_outPtr = output + outputOffset;
 
     // Create encoder instance
@@ -332,7 +546,7 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
         for (; ndirect_msb < 16; ++ndirect_msb)
         {
             ndirect = ndirect_msb << npostfix;
-            BrotliInitDistanceParams(&new_params, npostfix, ndirect);
+            BrotliInitDistanceParams(&new_params.dist, npostfix, ndirect, new_params.large_window);
             if (npostfix == orig_params.dist.distance_postfix_bits
                 && ndirect == orig_params.dist.num_direct_distance_codes)
                 check_orig = false;
@@ -387,7 +601,6 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     uint8_t* litqueue = new uint8_t[inSize];
     uint8_t* litqfront = litqueue;
     uint8_t* litqback = litqueue;
-    uint32_t numLits = 0;
 
     HistogramDistance distCtxHists[BROTLIG_NUM_DIST_CONTEXT_HISTOGRAMS];
     ClearHistogramsDistance(distCtxHists, BROTLIG_NUM_DIST_CONTEXT_HISTOGRAMS);
@@ -406,7 +619,6 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
         while (insertLen--) {
             ++m_histLiterals[p_inPtr[pos]];
             *litqback++ = p_inPtr[pos++];
-            ++numLits;
         }
         pos += (cmd.copy_len_ & 0x1FFFFFF);
     }
@@ -473,11 +685,8 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     );
 
     // Encode and store commands and literals
-    size_t highestFreq = 0;
     cmdIndex = 0;
-    BrotligBitWriterLSB* bs_bw = nullptr;
     size_t bsindex = 0;
-    bool sentinelFound = false;
 
     size_t nRounds = (m_state->num_commands_ + numbitstreams - 1) / numbitstreams;
     Command* cqfront = m_state->commands_;
@@ -497,7 +706,6 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
 
             if (cmd.insert_len_ == 0 && (cmd.copy_len_ & 0x1FFFFFF) == 0)
             {
-                sentinelFound = true;
                 break;
             }
 
@@ -647,7 +855,7 @@ void PageEncoder::StoreDistance(uint16_t dist_prefix, uint32_t distextra)
     uint16_t nbits = m_distCodelens[dist_code];
     uint32_t distnumextra = dist_prefix >> 10;
     m_pWriter->Append(nbits, m_distCodes[dist_code]);
-    m_pWriter->Append(distnumextra, distextra);   
+    m_pWriter->Append(distnumextra, distextra);
 }
 
 void PageEncoder::Cleanup()

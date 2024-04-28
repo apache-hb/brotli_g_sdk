@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -19,9 +19,6 @@
 
 #include "common/BrotligCommon.h"
 #include "common/BrotligConstants.h"
-#include "common/BrotligUtils.h"
-#include "common/BrotligBitReader.h"
-#include "common/BrotligBitWriter.h"
 
 #include "BrotligDataConditioner.h"
 
@@ -53,8 +50,8 @@ bool Swizzle(uint32_t size, uint8_t* data, uint32_t blockSize, uint32_t widthInB
                     memcpy(&data[outIndex], &temp[inIndex], blockSize);
                     ++outCol;
 
-                    if (outCol == effWidthInBlocks) 
-                    { 
+                    if (outCol == effWidthInBlocks)
+                    {
                         outCol = 0; ++outRow;
                     }
                 }
@@ -95,7 +92,6 @@ void ConditionBC1_5(uint32_t inSize, const uint8_t* inData, BrotliG::BrotligData
     memcpy(&subStreamCopyPtrs, &params.subStreamOffsets, BROTLIG_MAX_NUM_SUB_BLOCKS * sizeof(uint32_t));
     for (uint32_t mip = 0; mip < params.numMipLevels; ++mip)
     {
-        uint32_t rowpaddingInBytes = params.pitchInBytes[mip] - (params.widthInBlocks[mip] * params.blockSizeBytes);
         uint32_t mipOffset = params.mipOffsetsBytes[mip], rowOffset = 0, inIndex = 0;
 
         for (uint32_t row = 0; row < params.heightInBlocks[mip]; ++row)

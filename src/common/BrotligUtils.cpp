@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -23,11 +23,15 @@
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-#include <cassert>
+#define NOMINMAX
+#include <windows.h>
 
-#include "common/BrotligConstants.h"
+#include <cassert>
+#include <fstream>
 
 #include "BrotligUtils.h"
+
+#include "c/common/constants.h"
 
 size_t BrotliG::ComputeFileSize(std::string filename)
 {
@@ -170,11 +174,11 @@ void ComputeRLEReps(
 }
 
 void BrotliG::ComputeRLECodes(
-    size_t size, 
-    uint8_t* data, 
-    uint8_t* rle_codes, 
+    size_t size,
+    uint8_t* data,
+    uint8_t* rle_codes,
     size_t& num_rle_codes,
-    uint8_t* rle_extra_bits, 
+    uint8_t* rle_extra_bits,
     size_t& num_rle_extra_bits)
 {
     bool use_rle_for_non_zeros = true;

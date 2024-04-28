@@ -18,6 +18,12 @@
 *.cmake
 *.bin
 *.ilk
+.cache/
+build/
+
+subprojects/*
+!subprojects/*.wrap
+!subprojects/packagefiles/
 
 CMakeFiles
 .vs

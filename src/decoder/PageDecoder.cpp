@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -17,7 +17,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#include "common/BrotligBitReader.h"
+
+#include "BrotligBitReader.h"
 #include "common/BrotligDataConditioner.h"
 
 #include "decoder/BrotligHuffmanTable.h"
@@ -35,7 +36,7 @@ PageDecoder::PageDecoder()
         m_symbols[i] = nullptr;
         m_codelens[i] = nullptr;
     }
-    
+
     m_distring[0] = m_distring[1] = m_distring[2] = m_distring[3] = 0;
 }
 
@@ -242,7 +243,7 @@ bool PageDecoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
 
     if (m_dcparams.precondition && (outputOffset < (m_dcparams.tNumBlocks * m_dcparams.blockSizeBytes)))
     {
-        uint32_t tTexSize = m_dcparams.tNumBlocks * m_dcparams.blockSizeBytes, mip = 0, sub = 0;
+        uint32_t tTexSize = m_dcparams.tNumBlocks * m_dcparams.blockSizeBytes, sub = 0;
         while (outputOffset >= m_dcparams.subStreamOffsets[sub + 1]) ++sub;
 
         size_t outindex = 0, index = 0, offsetIndex = 0;
@@ -404,7 +405,7 @@ void PageDecoder::TranslateDistance(BrotligCommand& cmd)
 }
 
 uint32_t PageDecoder::DeconditionBC1_5(uint32_t offsetAddr, uint32_t sub)
-{    
+{
     uint32_t adjAddr = offsetAddr, mip = 0;
     while (adjAddr >= m_dcparams.mipOffsetBlocks[mip + 1] * m_dcparams.subBlockSizes[sub]) ++mip;
     adjAddr -= m_dcparams.mipOffsetBlocks[mip] * m_dcparams.subBlockSizes[sub];
@@ -445,7 +446,7 @@ uint32_t PageDecoder::DeconditionBC1_5(uint32_t offsetAddr, uint32_t sub)
 
 void PageDecoder::DeltaDecode(size_t page_start, size_t page_end, uint8_t* data)
 {
-    uint32_t sub = 0, refIdx = 0;;
+    uint32_t sub = 0;
     size_t color_start = 0, color_end = 0, p_sub_start = 0, p_sub_end = 0, p_sub_size = 0;
     for (uint32_t i = 0; i < m_dcparams.numColorSubBlocks; ++i)
     {

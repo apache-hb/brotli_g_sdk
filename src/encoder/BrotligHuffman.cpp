@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -23,10 +23,10 @@
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-extern "C" {
-#include "brotli/c/enc/entropy_encode.h"
-}
+#include <cassert>
+#include <queue>
 
+#include "BrotligSwizzler.h"
 #include "common/BrotligConstants.h"
 #include "common/BrotligUtils.h"
 
@@ -169,7 +169,7 @@ void BuildHuffman(uint32_t* hist, size_t alphabet_size, uint16_t codes[], uint8_
     };
 
     // Count the number for codes for each length
-    for each (BrotligHuffmanNodePtr node in nodeList) ++blCounts[node->depth];
+    for (BrotligHuffmanNodePtr node : nodeList) ++blCounts[node->depth];
 
     // Find the numerical values of the smallest code for each code length
     uint16_t code = 0;
@@ -179,7 +179,7 @@ void BuildHuffman(uint32_t* hist, size_t alphabet_size, uint16_t codes[], uint8_
 
     // Assign numerical values to all codes using consecutive values for all codes of the same length
     // with the base values determined by the previous step.
-    for each (BrotligHuffmanNodePtr node in nodeList)
+    for (BrotligHuffmanNodePtr node : nodeList)
     {
         codelens[node->symbol] = node->depth;
         codes[node->symbol] = BrotligReverseBits(node->depth, next_code[node->depth]++);
@@ -192,18 +192,15 @@ void BuildHuffman(uint32_t* hist, size_t alphabet_size, uint16_t codes[], uint8_
 
 static void StoreComplexHuffman(uint16_t codes[], uint8_t codelens[], size_t alphabet_size, BrotligSwizzler& writer)
 {
-    bool use_rle_for_non_zeros = true;
-    bool use_rle_for_zeros = true;
-
     uint8_t rle_codes[BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE], rle_extra_bits[BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE];
     size_t num_rle_codes = 0, num_rle_extra_bits = 0;
 
     ComputeRLECodes(
-        alphabet_size, 
-        codelens, 
-        rle_codes, 
-        num_rle_codes, 
-        rle_extra_bits, 
+        alphabet_size,
+        codelens,
+        rle_codes,
+        num_rle_codes,
+        rle_extra_bits,
         num_rle_extra_bits
     );
 
@@ -260,15 +257,15 @@ static void StoreComplexHuffman(uint16_t codes[], uint8_t codelens[], size_t alp
 }
 
 void BrotliG::BuildStoreHuffmanTable(
-    uint32_t* hist, 
-    size_t alphabet_size, 
-    BrotligSwizzler& writer, 
-    uint16_t codes[], 
+    uint32_t* hist,
+    size_t alphabet_size,
+    BrotligSwizzler& writer,
+    uint16_t codes[],
     uint8_t codelens[])
 {
     memset(codes, 0, sizeof(uint16_t) * alphabet_size);
     memset(codelens, 0, sizeof(uint8_t) * alphabet_size);
-    
+
     size_t count = 0;
     size_t s4[4] = { 0 };
     for (size_t i = 0; i < alphabet_size; ++i)
@@ -306,9 +303,6 @@ void BrotliG::BuildStoreHuffmanTable(
         writer.BSReset();
         return;
     }
-    
-    memset(codelens, 0, sizeof(codelens));
-    memset(codes, 0, sizeof(codes));
 
     BuildHuffman(hist, alphabet_size, codes, codelens);
 
@@ -321,7 +315,7 @@ void BrotliG::BuildStoreHuffmanTable(
             /* sort */
             for (size_t i = 0; i < count; ++i)
                 for (size_t j = i + 1; j < count; ++j)
-                    if ((codelens[s4[j]] < codelens[s4[i]]) || 
+                    if ((codelens[s4[j]] < codelens[s4[i]]) ||
                         (codelens[s4[j]] == codelens[s4[i]] && s4[j] < s4[i]))
                         BROTLI_SWAP(size_t, s4, j, i);
         }
@@ -339,7 +333,7 @@ void BrotliG::BuildStoreHuffmanTable(
             writer.Append((uint32_t)max_bits, (uint32_t)s4[1], true);
             writer.Append((uint32_t)max_bits, (uint32_t)s4[2], true);
             break;
-        case 4:                                                     
+        case 4:
             writer.Append(1, (uint32_t)codelens[s4[0]] == 1 ? 1 : 0);   // tree select
             writer.Append(1, 0);                                        // extra header bits
             writer.Append((uint32_t)max_bits, (uint32_t)s4[0], true);

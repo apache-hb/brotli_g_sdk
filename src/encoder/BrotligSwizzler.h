@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -21,10 +21,13 @@
 #pragma once
 
 #include "common/BrotligBitWriter.h"
-#include "common/BrotligConstants.h"
+
+#include <vector>
 
 namespace BrotliG
 {
+    class BrotligBitWriterLSB;
+
     class BrotligSwizzler
     {
     public:
@@ -32,9 +35,9 @@ namespace BrotliG
 
         ~BrotligSwizzler();
 
-        inline void AppendToHeader(uint32_t n, uint32_t bits) 
-        { 
-            m_headerWriter->Write(n, (uint64_t)bits); 
+        inline void AppendToHeader(uint32_t n, uint32_t bits)
+        {
+            m_headerWriter->Write(n, (uint64_t)bits);
         }
 
         void AppendBitstreamSizes();
