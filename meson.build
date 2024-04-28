@@ -16,6 +16,7 @@ decode = dependency('libbrotlienc')
 src = [
     'src/common/BrotligDataConditioner.cpp',
     'src/common/BrotligUtils.cpp',
+    'src/common/BrotligCommand.cpp',
     'src/common/BrotligBitWriter.cpp',
 
     'src/decoder/BrotligHuffmanTable.cpp',
@@ -32,10 +33,12 @@ src = [
 
 inc = include_directories('inc', 'inc/common', 'inc/decoder', 'inc/encoder')
 
+shader = files('src/decoder/BrotliGCompute.hlsl')
+
 libbrotlig = library('brotli_g_sdk', src,
     include_directories : inc,
     dependencies : [ common, encode, decode ],
-    extra_files : 'src/decoder/BrotliGCompute.hlsl'
+    extra_files : shader
 )
 
 brotlig_dep = declare_dependency(
@@ -46,14 +49,16 @@ brotlig_dep = declare_dependency(
 
 build_sample = get_option('build_sample').disable_auto_if(meson.is_subproject())
 if build_sample.allowed()
+    fs = import('fs')
     d3dx12 = dependency('directx-headers')
     dxcompiler = dependency('dxcompiler')
     d3d12 = cpp.find_library('d3d12')
     dxgi = cpp.find_library('dxgi')
     dxguid = cpp.find_library('dxguid')
 
-    executable('brotli_g_sample', 'sample/brotlig_cli.cpp', 'sample/BrotligGPUDecoder.cpp',
-        dependencies : [ brotlig_dep, d3dx12, dxcompiler, d3d12, dxgi, dxguid ]
+    executable('brotli_g_sample', 'sample/brotlig_cli.cpp', 'sample/BrotligGPUDecoder.cpp', fs.copyfile(shader),
+        dependencies : [ brotlig_dep, d3dx12, dxcompiler, d3d12, dxgi, dxguid ],
+        cpp_args : [ '-DUSE_BROTLI_CODEC', '-DUSE_GPU_DECOMPRESSION' ]
     )
 endif
 

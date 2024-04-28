@@ -25,8 +25,6 @@
 
 #pragma once
 
-#include "common/BrotligReverseBits.h"
-
 #include <string>
 
 namespace BrotliG
@@ -49,10 +47,9 @@ namespace BrotliG
         return n;
     }
 
-    inline uint16_t BrotligReverseBits15(uint16_t bits)
-    {
-        return sBrotligReverseBits15[bits];
-    }
+    uint16_t BrotligReverseBits9(uint16_t bits);
+
+    uint16_t BrotligReverseBits15(uint16_t bits);
 
     inline uint16_t BrotligReverseBits(size_t num_bits, uint16_t bits)
     {

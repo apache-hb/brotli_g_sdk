@@ -172,7 +172,6 @@ void BuildHuffman(uint32_t* hist, size_t alphabet_size, uint16_t codes[], uint8_
     for (BrotligHuffmanNodePtr node : nodeList) ++blCounts[node->depth];
 
     // Find the numerical values of the smallest code for each code length
-    uint16_t code = 0;
     blCounts[0] = 0;
     for (uint16_t bits = 1; bits < BROTLIG_HUFFMAN_NUM_CODE_LENGTH; ++bits)
         next_code[bits] = (next_code[bits - 1] + blCounts[bits - 1]) << 1;

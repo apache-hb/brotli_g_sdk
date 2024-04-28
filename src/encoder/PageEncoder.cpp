@@ -23,6 +23,9 @@
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
+extern "C" {
+#include "c/common/context.h"
+}
 
 #include "c/common/transform.h"
 
@@ -135,7 +138,8 @@ static void BrotligCreateHqZopfliBackwardReferences(
     size_t endPos = 0, cmdIndex = 0;
     while (cmdIndex < state->num_commands_) {
         assert((state->commands_[cmdIndex].copy_len_ & 0x1FFFFFF) < input_size);
-        endPos += state->commands_[cmdIndex].insert_len_ + (state->commands_[cmdIndex++].copy_len_ & 0x1FFFFFF);
+        endPos += state->commands_[cmdIndex].insert_len_ + (state->commands_[cmdIndex].copy_len_ & 0x1FFFFFF);
+        cmdIndex += 1;
     }
 
     if (endPos < input_size)

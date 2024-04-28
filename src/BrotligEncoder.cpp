@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -18,8 +18,9 @@
 // THE SOFTWARE.
 
 
-#include <iostream>
+#include <atomic>
 #include <thread>
+#include <vector>
 
 #include "common/BrotligConstants.h"
 
@@ -33,7 +34,7 @@
 using namespace BrotliG;
 
 uint32_t BROTLIG_API BrotliG::MaxCompressedSize(uint32_t input_size, bool precondition, bool deltaencode)
-{    
+{
     uint32_t numPages = (input_size + BROTLIG_DEFAULT_PAGE_SIZE - 1) / (BROTLIG_DEFAULT_PAGE_SIZE);
     uint32_t compressedPagesSize = static_cast<uint32_t>(PageEncoder::MaxCompressedSize(BROTLIG_DEFAULT_PAGE_SIZE));
     uint32_t estimatedSize = (numPages * compressedPagesSize) + (numPages * BROTLIG_PAGE_HEADER_SIZE_BYTES) + sizeof(StreamHeader);
@@ -116,7 +117,7 @@ void EncodeWithPreconSinglethreaded(
     BrotligDataconditionParams& dcParams,
     BROTLIG_Feedback_Proc feedbackProc
 )
-{   
+{
     uint8_t* srcConditioned = nullptr;
     uint32_t srcCondSize = 0;
 
@@ -258,7 +259,7 @@ void EncodeNoPreconSinglethreaded(
 
     uint32_t pageIndex = 0;
     uint32_t sizeLeftToRead = input_size, sizeToRead = 0, curInOffset = 0, curOutOffset = 0;
-    
+
     uint8_t* outPtr = tOutput;
 
     while (pageIndex < numPages) {

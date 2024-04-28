@@ -18,20 +18,14 @@
 // THE SOFTWARE.
 #pragma once
 
-extern "C" {
-#include "c/dec/huffman.h"
-}
-
-#include "common/BrotligCommand.h"
 #include "common/BrotligDeswizzler.h"
-#include "common/BrotligCommandLut.h"
 #include "common/BrotligDataConditioner.h"
-
-#include "DataStream.h"
 
 namespace BrotliG
 {
-    typedef struct BrotligDecoderParams
+    struct BrotligCommand;
+
+    struct BrotligDecoderParams
     {
         int lgwin;
         uint32_t distance_postfix_bits;
@@ -40,40 +34,15 @@ namespace BrotliG
         size_t page_size;
         size_t num_bitstreams;
 
-        BrotligDecoderParams()
-        {
-            lgwin = BROTLI_DEFAULT_WINDOW;
-            distance_postfix_bits = 0;
-            num_direct_distance_codes = 0;
-
-            page_size = BROTLIG_DEFAULT_PAGE_SIZE;
-            num_bitstreams = BROLTIG_DEFAULT_NUM_BITSTREAMS;
-        }
+        BrotligDecoderParams();
 
         BrotligDecoderParams(
             size_t p_size,
             size_t n_bitstreams
-        )
-        {
-            lgwin = BROTLI_DEFAULT_WINDOW;
-            distance_postfix_bits = 0;
-            num_direct_distance_codes = 0;
+        );
 
-            page_size = p_size;
-            num_bitstreams = n_bitstreams;
-        }
-
-        BrotligDecoderParams& operator=(const BrotligDecoderParams& other)
-        {
-            this->lgwin = other.lgwin;
-            this->distance_postfix_bits = other.distance_postfix_bits;
-            this->num_direct_distance_codes = other.num_direct_distance_codes;
-            this->page_size = other.page_size;
-            this->num_bitstreams = other.num_bitstreams;
-
-            return *this;
-        }
-    }BrotligDecoderParams;
+        BrotligDecoderParams& operator=(const BrotligDecoderParams& other);
+    };
 
     class PageDecoder
     {

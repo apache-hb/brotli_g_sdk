@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -19,32 +19,8 @@
 
 #pragma once
 
-#define NOMINMAX
-
-#include <algorithm>
-#include <assert.h>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <iterator>
-#include <memory>
-#include <numeric>
-#include <sstream>
+#include <cassert>
 #include <string>
-#include <unordered_map>
-#include <vector>
-#include <variant>
-#include <queue>
-#include <set>
-#include <Windows.h>
-
-#include <d3d12.h>
-
-#include "common/BrotligFlags.h"
-#include "common/BrotligConstants.h"
 
 // Compress error codes
 typedef enum {

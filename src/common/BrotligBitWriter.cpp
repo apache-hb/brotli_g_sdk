@@ -90,34 +90,3 @@ void BrotligBitWriterLSB::StoreVanLenUint8(
         bw->Write(nbits, n - ((size_t)1 << nbits));
     }
 }
-
-void BrotligBitWriterMSB::Write(size_t n_bits, uint64_t bits)
-{
-    // shift all the bits to the left
-    bits <<= 64 - n_bits;
-
-    // Starting from the 'n_bits' leftmost bit, read n_bits, one at a time, left to right
-    size_t bitsremaining = n_bits;
-    while (bitsremaining > 0)
-    {
-        unsigned char* p = &m_storage[m_curbitpos >> 3];
-        // From the current bit position, find the bit position in the current byte from the left
-        size_t bitposinbyte = (m_curbitpos & 7);
-        size_t bitsempty = 8 - bitposinbyte;
-        size_t extractLen = (bitsremaining > bitsempty) ? bitsempty : bitsremaining;
-
-        // isolate "extractlen" leftmost bits from shiftedbits
-        uint64_t mask = static_cast<uint64_t>(0xFFFFFFFFFFFFFFFF) & ~((static_cast<uint64_t>(1u) << (64 - extractLen)) - 1);
-        uint64_t extractedbits = bits & mask;
-        bits <<= extractLen;
-
-        // shift bits into position
-        extractedbits >>= 56 + bitposinbyte;
-        unsigned char val = ((unsigned char)extractedbits);
-
-        (*p) |= val;
-
-        bitsremaining -= extractLen;
-        m_curbitpos += extractLen;
-    }
-}

@@ -20,6 +20,7 @@
 #include "BrotligConstants.h"
 #include "BrotligSwizzler.h"
 #include "common/BrotligUtils.h"
+#include "common/BrotligBitWriter.h"
 
 #include "c/enc/fast_log.h"
 

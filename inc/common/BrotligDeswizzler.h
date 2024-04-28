@@ -19,10 +19,6 @@
 
 #pragma once
 
-extern "C" {
-#include "c/dec/bit_reader.h"
-}
-
 #include <cassert>
 
 #include "common/BrotligConstants.h"

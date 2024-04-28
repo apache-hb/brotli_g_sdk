@@ -34,9 +34,8 @@
 #endif
 
 #ifdef USE_BROTLI_CODEC
-#include "c/common/constants.h"
-#include "encode.h"
-#include "decode.h"
+#include "brotli/encode.h"
+#include "brotli/decode.h"
 #endif
 
 #define GIGABYTES   (1024.0 * 1024.0 * 1024.0)

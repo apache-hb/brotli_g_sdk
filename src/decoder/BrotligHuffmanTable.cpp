@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -42,7 +42,7 @@ static const uint16_t DyanmicCodeLenReadOrder[BROTLI_CODE_LENGTH_CODES] = {
 };
 
 void GenerateHuffmanTable(uint16_t lens[], size_t size, uint16_t counts[], uint16_t next_code[], uint16_t numcodelengths, uint16_t symbols[], uint16_t codelens[])
-{    
+{
     // Find the numerical values of the smallest code for each code length
     uint16_t i = 0;
     counts[0] = 0;
@@ -163,7 +163,7 @@ void BrotliG::LoadHuffmanTable(
         while(symbols_left)
         {
             len_code = static_cast<uint16_t>(reader.ReadNoConsume9());
-            rev_len_code = sBrotligReverseBits9[len_code];
+            rev_len_code = BrotligReverseBits9(len_code);
             reader.Consume(len_codelens[rev_len_code]);
             len_symbol = len_symbols[rev_len_code];
 
@@ -195,7 +195,7 @@ void BrotliG::LoadHuffmanTable(
         }
 
         GenerateHuffmanTable(data, alphabet_size, blCounts, next_code, BROTLIG_HUFFMAN_NUM_CODE_LENGTH, symbols, codelens);
-        
+
         reader.BSReset();
         break;
     }

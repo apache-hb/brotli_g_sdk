@@ -33,6 +33,8 @@
 
 #include "c/common/constants.h"
 
+#include "BrotligReverseBits.inl"
+
 size_t BrotliG::ComputeFileSize(std::string filename)
 {
     std::ifstream file(filename, std::ios::in | std::ios::binary);
@@ -62,6 +64,16 @@ uint32_t BrotliG::Log2Floor(uint32_t x) {
 uint32_t BrotliG::Mask32(uint32_t n)
 {
     return (1u << n) - 1;
+}
+
+uint16_t BrotliG::BrotligReverseBits9(uint16_t bits)
+{
+    return sBrotligReverseBits9[bits];
+}
+
+uint16_t BrotliG::BrotligReverseBits15(uint16_t bits)
+{
+    return sBrotligReverseBits15[bits];
 }
 
 uint32_t BrotliG::GetNumberOfProcessorsThreads()

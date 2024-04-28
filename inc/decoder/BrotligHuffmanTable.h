@@ -19,14 +19,6 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <queue>
-
-extern "C" {
-#include "c/dec/huffman.h"
-}
-
 #include "common/BrotligDeswizzler.h"
 
 namespace BrotliG

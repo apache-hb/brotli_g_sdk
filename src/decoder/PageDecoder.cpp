@@ -18,16 +18,53 @@
 // THE SOFTWARE.
 
 
-#include "BrotligBitReader.h"
 #include "common/BrotligDataConditioner.h"
+#include "common/BrotligCommand.h"
 
 #include "decoder/BrotligHuffmanTable.h"
 
+#include "BrotligBitReader.h"
 #include "PageDecoder.h"
+
+#include "BrotligCommandLut.inl"
 
 using namespace BrotliG;
 
 #define OVERLAP(x1, x2, y1, y2) (x1 < y2 && y1 < x2)
+
+BrotligDecoderParams::BrotligDecoderParams()
+{
+    lgwin = BROTLI_DEFAULT_WINDOW;
+    distance_postfix_bits = 0;
+    num_direct_distance_codes = 0;
+
+    page_size = BROTLIG_DEFAULT_PAGE_SIZE;
+    num_bitstreams = BROLTIG_DEFAULT_NUM_BITSTREAMS;
+}
+
+BrotligDecoderParams::BrotligDecoderParams(
+    size_t p_size,
+    size_t n_bitstreams
+)
+{
+    lgwin = BROTLI_DEFAULT_WINDOW;
+    distance_postfix_bits = 0;
+    num_direct_distance_codes = 0;
+
+    page_size = p_size;
+    num_bitstreams = n_bitstreams;
+}
+
+BrotligDecoderParams& BrotligDecoderParams::operator=(const BrotligDecoderParams& other)
+{
+    this->lgwin = other.lgwin;
+    this->distance_postfix_bits = other.distance_postfix_bits;
+    this->num_direct_distance_codes = other.num_direct_distance_codes;
+    this->page_size = other.page_size;
+    this->num_bitstreams = other.num_bitstreams;
+
+    return *this;
+}
 
 PageDecoder::PageDecoder()
 {
@@ -290,7 +327,7 @@ void PageDecoder::Cleanup()
 
 bool PageDecoder::DecodeCommand(BrotligCommand& cmd)
 {
-    uint16_t bits = sBrotligReverseBits15[m_pReader.ReadNoConsume15()];
+    uint16_t bits = BrotligReverseBits15(m_pReader.ReadNoConsume15());
     m_pReader.Consume(m_codelens[BROTLIG_ICP_TREE_INDEX][bits]);
     cmd.cmd_prefix = m_symbols[BROTLIG_ICP_TREE_INDEX][bits];
 
@@ -322,7 +359,7 @@ bool PageDecoder::DecodeCommand(BrotligCommand& cmd)
 
 uint8_t PageDecoder::DecodeLiteral()
 {
-    uint16_t bits = sBrotligReverseBits15[m_pReader.ReadNoConsume15()];
+    uint16_t bits = BrotligReverseBits15(m_pReader.ReadNoConsume15());
     m_pReader.Consume(m_codelens[BROTLIG_LIT_TREE_INDEX][bits]);
     return (uint8_t)m_symbols[BROTLIG_LIT_TREE_INDEX][bits];
 }

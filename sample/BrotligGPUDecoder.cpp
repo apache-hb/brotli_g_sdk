@@ -17,14 +17,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-
 #define NOMINMAX
 #include <wrl.h>
 #include <dxgi1_6.h>
 #include <dxcapi.h>
 #include <directx/d3dx12.h>
 
-#include "DataStream.h"
+#include "BrotligGPUDecoder.h"
+#include "BrotligConstants.h"
 
 const wchar_t* shaderfile = L"BrotliGCompute.hlsl";
 const wchar_t* shaderfileOther = L"../../src/decoder/BrotliGCompute.hlsl";
@@ -265,9 +265,6 @@ BROTLIG_ERROR DecodeGPU(
     uint8_t* output,
     double& time)
 {
-    const BrotliG::StreamHeader* sHeader = reinterpret_cast<const BrotliG::StreamHeader*>(input);
-    bool isPreconditioned = sHeader->IsPreconditioned();
-
     ComPtr<ID3D12Device> device;
     ComPtr<ID3D12CommandAllocator> commandAllocator;
     ComPtr<ID3D12CommandQueue> commandQueue;

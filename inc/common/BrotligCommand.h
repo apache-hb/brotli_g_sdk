@@ -29,12 +29,11 @@ extern "C" {
 #include "c/enc/command.h"
 }
 
-#include "common/BrotligBitWriter.h"
-#include "common/BrotligCommon.h"
-
 namespace BrotliG
 {
-    typedef struct BrotligCommand
+    class BrotligBitWriterLSB;
+
+    struct BrotligCommand
     {
         uint32_t insert_pos;
         uint32_t insert_len;
@@ -45,181 +44,28 @@ namespace BrotliG
         uint32_t dist;
         int32_t dist_code;
 
-        BrotligCommand()
-        {
-            insert_pos = 0;
-            insert_len = 0;
-            copy_len = 0;
-            dist_extra = 0;
-            cmd_prefix = 0;
-            dist_prefix = 0;
-            dist = 0;
-            dist_code = 0;
-        }
+        BrotligCommand();
 
-        Command* ToBroliCommand()
-        {
-            Command* out = new Command;
-            out->insert_len_ = insert_len;
-            out->copy_len_ = copy_len;
-            out->cmd_prefix_ = cmd_prefix;
-            out->dist_prefix_ = dist_prefix;
-            out->dist_extra_ = dist_extra;
+        Command* ToBroliCommand();
 
-            return out;
-        }
+        void Copy(Command* in);
 
-        void Copy(Command* in)
-        {
-            insert_len = in->insert_len_;
-            copy_len = in->copy_len_;
-            cmd_prefix = in->cmd_prefix_;
-            dist_prefix = in->dist_prefix_;
-            dist_extra = in->dist_extra_;
-            dist = 0;
-            dist_code = 0;
-        }
+        uint32_t CopyLen();
 
-        uint32_t CopyLen()
-        {
-            return copy_len & 0x1FFFFFF;
-        }
+        uint32_t DistanceContext();
 
-        uint32_t DistanceContext()
-        {
-            uint32_t r = cmd_prefix >> 6;
-            uint32_t c = cmd_prefix & 7;
-            if ((r == 0 || r == 2 || r == 4 || r == 7) && (c <= 2)) {
-                return c;
-            }
-            return 3;
-        }
+        uint16_t Distance();
 
-        uint16_t Distance()
-        {
-            return dist_prefix & 0x3FF;
-        }
+        uint32_t CopyLenCode();
 
-        uint32_t CopyLenCode()
-        {
-            uint32_t modifier = copy_len >> 25;
-            int32_t delta = (int8_t)((uint8_t)(modifier | ((modifier & 0x40) << 1)));
-            return (uint32_t)((int32_t)(copy_len & 0x1FFFFFF) + delta);
-        }
+        uint16_t InsertLengthCode();
 
-        uint16_t InsertLengthCode()
-        {
-            if (insert_len < 6) {
-                return (uint16_t)insert_len;
-            }
-            else if (insert_len < 130) {
-                uint32_t nbits = Log2FloorNonZero(insert_len - 2) - 1u;
-                return (uint16_t)((nbits << 1) + ((insert_len - 2) >> nbits) + 2);
-            }
-            else if (insert_len < 2114) {
-                return (uint16_t)(Log2FloorNonZero(insert_len - 66) + 10);
-            }
-            else if (insert_len < 6210) {
-                return 21u;
-            }
-            else if (insert_len < 22594) {
-                return 22u;
-            }
-            else {
-                return 23u;
-            }
-        }
+        uint16_t GetCopyLengthCode(size_t copylen);
 
-        uint16_t GetCopyLengthCode(size_t copylen) {
-            if (copylen == 0) {
-                return (uint16_t)(copylen);
-            }
-            else if (copylen < 10) {
-                return (uint16_t)(copylen - 2);
-            }
-            else if (copylen < 134) {
-                uint32_t nbits = Log2FloorNonZero(copylen - 6) - 1u;
-                return (uint16_t)((nbits << 1u) + ((copylen - 6) >> nbits) + 4);
-            }
-            else if (copylen < 2118) {
-                return (uint16_t)(Log2FloorNonZero(copylen - 70) + 12);
-            }
-            else {
-                return 23u;
-            }
-        }
+        void GetExtra(uint32_t& n_bits, uint64_t& bits);
 
-        void GetExtra(uint32_t& n_bits, uint64_t& bits)
-        {
-            if (cmd_prefix <= BROTLI_NUM_COMMAND_SYMBOLS)
-            {
-                uint32_t copylen_code = CopyLenCode();
-                uint16_t inscode = InsertLengthCode();
-                uint16_t copycode = GetCopyLengthCode(copylen_code);
-                uint32_t insnumextra = GetInsertExtra(inscode);
-                uint64_t insextraval = insert_len - GetInsertBase(inscode);
-                uint64_t copyextraval = (copycode > 1) ? copylen_code - GetCopyBase(copycode) : copylen_code;
-                bits = (copyextraval << insnumextra) | insextraval;
-                n_bits = insnumextra + GetCopyExtra(copycode);
-            }
-            else
-            {
-                uint32_t inscode = InsertLengthCode();
-                uint32_t insnumextra = GetInsertExtra(inscode);
-                uint64_t insextraval = insert_len - GetInsertBase(inscode);
-                bits = insextraval;
-                n_bits = insnumextra;
-            }
-        }
+        void StoreExtra(BrotligBitWriterLSB* bw);
 
-        void StoreExtra(BrotligBitWriterLSB* bw)
-        {
-            if (cmd_prefix <= BROTLI_NUM_COMMAND_SYMBOLS)
-            {
-                uint32_t copylen_code = CopyLenCode();
-                uint16_t inscode = InsertLengthCode();
-                uint16_t copycode = GetCopyLengthCode(copylen_code);
-                uint32_t insnumextra = GetInsertExtra(inscode);
-                uint64_t insextraval = insert_len - GetInsertBase(inscode);
-                uint64_t copyextraval = (copycode > 1) ? copylen_code - GetCopyBase(copycode) : copylen_code;
-                uint64_t bits = (copyextraval << insnumextra) | insextraval;
-                bw->Write(insnumextra + GetCopyExtra(copycode), bits);
-            }
-            else
-            {
-                uint16_t inscode = InsertLengthCode();
-                uint32_t insnumextra = GetInsertExtra(inscode);
-                uint64_t insextraval = insert_len - GetInsertBase(inscode);
-                uint64_t bits = insextraval;
-                bw->Write(insnumextra, bits);
-            }
-        }
-
-        uint16_t CombineLengthCodes(
-            uint16_t inscode, uint16_t copycode, bool use_last_distance) {
-            uint16_t bits64 =
-                (uint16_t)((copycode & 0x7u) | ((inscode & 0x7u) << 3u));
-            if (use_last_distance && inscode < 8u && copycode < 16u) {
-                uint16_t combinedcode = (copycode < 8u) ? bits64 : (bits64 | 64u);
-                assert(combinedcode < BROTLI_NUM_COMMAND_SYMBOLS);
-                return combinedcode;
-            }
-            else {
-                /* Specification: 5 Encoding of ... (last table) */
-                /* offset = 2 * index, where index is in range [0..8] */
-                uint32_t offset = 2u * ((copycode >> 3u) + 3u * (inscode >> 3u));
-                /* All values in specification are K * 64,
-                   where   K = [2, 3, 6, 4, 5, 8, 7, 9, 10],
-                       i + 1 = [1, 2, 3, 4, 5, 6, 7, 8,  9],
-                   K - i - 1 = [1, 1, 3, 0, 0, 2, 0, 1,  2] = D.
-                   All values in D require only 2 bits to encode.
-                   Magic constant is shifted 6 bits left, to avoid final multiplication. */
-                offset = (offset << 5u) + 0x40u + ((0x520D40u >> offset) & 0xC0u);
-                uint16_t combinedcode = (uint16_t)(offset | bits64);
-                assert(combinedcode < BROTLI_NUM_COMMAND_SYMBOLS);
-                return combinedcode;
-            }
-        }
-
-    }BrotligCommand;
+        uint16_t CombineLengthCodes(uint16_t inscode, uint16_t copycode, bool use_last_distance);
+    };
 }
