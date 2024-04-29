@@ -18,7 +18,14 @@
 // THE SOFTWARE.
 #pragma once
 
+// IWYU pragma: begin_exports
+
 #include "common/BrotligCommon.h"
+#include "common/BrotligConstants.h"
+#include "common/BrotligFlags.h"
+#include "common/BrotligDataConditioner.h"
+
+// IWYU pragma: end_exports
 
 namespace BrotliG
 {
@@ -26,7 +33,10 @@ namespace BrotliG
     extern "C"
     {
 #endif // __cplusplus
+        [[nodiscard]]
         uint32_t BROTLIG_API DecompressedSize(uint8_t* src);
+
+        [[nodiscard]]
         BROTLIG_ERROR BROTLIG_API DecodeCPU(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t* output, BROTLIG_Feedback_Proc feedbackProc);
 #ifdef __cplusplus
     };

@@ -19,7 +19,9 @@
 
 #include "BrotligBitWriter.h"
 
+extern "C" {
 #include "c/enc/fast_log.h"
+}
 
 using namespace BrotliG;
 

@@ -19,8 +19,13 @@
 
 #pragma once
 
+// IWYU pragma: begin_exports
+
 #include "common/BrotligCommon.h"
 #include "common/BrotligDataConditioner.h"
+#include "common/BrotligFlags.h"
+
+// IWYU pragma: end_exports
 
 namespace BrotliG
 {
@@ -29,9 +34,13 @@ namespace BrotliG
     {
 #endif // __cplusplus
 
+        [[nodiscard]]
         uint32_t BROTLIG_API MaxCompressedSize(uint32_t inputSize, bool precondition = false, bool deltaencode = false);
 
+        [[nodiscard]]
         BROTLIG_ERROR BROTLIG_API CheckParams(uint32_t page_size, BrotligDataconditionParams dcParams);
+
+        [[nodiscard]]
         BROTLIG_ERROR BROTLIG_API Encode(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t*& output, uint32_t page_size, BrotligDataconditionParams dcParams, BROTLIG_Feedback_Proc feedbackProc);
 
 #ifdef __cplusplus

@@ -23,13 +23,6 @@
 
 using namespace BrotliG;
 
-static const uint16_t FixedCodes[4][4] = {
-        { 0, 1, 0, 0 },
-        { 0, 2, 3, 0 },
-        { 0, 1, 2, 3 },
-        { 0, 2, 6, 7 }
-};
-
 static const uint16_t FixedCodelengths[4][4] = {
         { 1, 1, 0, 0 },
         { 1, 2, 2, 0 },
@@ -70,7 +63,7 @@ void GenerateHuffmanTable(uint16_t lens[], size_t size, uint16_t counts[], uint1
     }
 }
 
-void BrotliG::LoadHuffmanTable(
+BROTLIG_ERROR BrotliG::LoadHuffmanTable(
     BrotligDeswizzler& reader,
     size_t alphabet_size,
     uint16_t symbols[],
@@ -200,6 +193,8 @@ void BrotliG::LoadHuffmanTable(
         break;
     }
     default:
-        throw std::exception("Error loading huffman table. Incorrect tree type.");
+        return BROTLIG_ERROR_HUFFMAN_TREE_INVALID_TYPE;
     }
+
+    return BROTLIG_OK;
 }

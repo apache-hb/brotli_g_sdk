@@ -26,20 +26,22 @@
 typedef enum {
     BROTLIG_OK = 0,
     BROTLIG_ABORTED,
-    BROTLIG_ERROR_MIN_PAGE_SIZE,            // Page size is less than the minimum allowed page size BROTLIG_MIN_PAGE_SIZE
-    BROTLIG_ERROR_MAX_PAGE_SIZE,            // Page size exceeds maximum allowed page size BROTLIG_MAX_PAGE_SIZE
-    BROTLIG_ERROR_MAX_NUM_PAGES,            // Number of pages numpages exceeds maximum number of pages allowed BROTLIG_MAX_NUM_PAGES
-    BROTLIG_ERROR_PRECON_MIN_TEX_WIDTH,     // Tex width is less than the minimum allowed tex width
-    BROTLIG_ERROR_PRECON_MAX_TEX_WIDTH,     // Tex width is greater than the maximum allowed tex width
-    BROTLIG_ERROR_PRECON_MIN_TEX_HEIGHT,    // Tex height is less than the minimumm allowed tex height
-    BROTLIG_ERROR_PRECON_MAX_TEX_HEIGHT,    // Tex height is greater than the maximum allowed tex height
-    BROTLIG_ERROR_PRECON_MIN_TEX_PITCH,     // Tex pitch is less than the minimum allowed tex pitch
-    BROTLIG_ERROR_PRECON_MAX_TEX_PITCH,     // Tex pitch is greater than the maximum allowed tex pitch
-    BROTLIG_ERROR_PRECON_MIN_TEX_MIPLEVELS, // Tex num mip levels is less than the minimum allowed mip levels
-    BROTLIG_ERROR_PRECON_MAX_TEX_MIPLEVELS, // Tex num mip levels is greater than the maximum allowed mip levels
-    BROTLIG_ERROR_PRECON_INCORRECT_FORMAT,  // Incorrect Texture format
-    BROTLIG_ERROR_CORRUPT_STREAM,           // Corrupt stream
-    BROTLIG_ERROR_INCORRECT_STREAM_FORMAT,  // Incorrect stream format
+    BROTLIG_ERROR_MIN_PAGE_SIZE,              // Page size is less than the minimum allowed page size BROTLIG_MIN_PAGE_SIZE
+    BROTLIG_ERROR_MAX_PAGE_SIZE,              // Page size exceeds maximum allowed page size BROTLIG_MAX_PAGE_SIZE
+    BROTLIG_ERROR_MAX_NUM_PAGES,              // Number of pages numpages exceeds maximum number of pages allowed BROTLIG_MAX_NUM_PAGES
+    BROTLIG_ERROR_PRECON_MIN_TEX_WIDTH,       // Tex width is less than the minimum allowed tex width
+    BROTLIG_ERROR_PRECON_MAX_TEX_WIDTH,       // Tex width is greater than the maximum allowed tex width
+    BROTLIG_ERROR_PRECON_MIN_TEX_HEIGHT,      // Tex height is less than the minimumm allowed tex height
+    BROTLIG_ERROR_PRECON_MAX_TEX_HEIGHT,      // Tex height is greater than the maximum allowed tex height
+    BROTLIG_ERROR_PRECON_MIN_TEX_PITCH,       // Tex pitch is less than the minimum allowed tex pitch
+    BROTLIG_ERROR_PRECON_MAX_TEX_PITCH,       // Tex pitch is greater than the maximum allowed tex pitch
+    BROTLIG_ERROR_PRECON_MIN_TEX_MIPLEVELS,   // Tex num mip levels is less than the minimum allowed mip levels
+    BROTLIG_ERROR_PRECON_MAX_TEX_MIPLEVELS,   // Tex num mip levels is greater than the maximum allowed mip levels
+    BROTLIG_ERROR_PRECON_INCORRECT_FORMAT,    // Incorrect Texture format
+    BROTLIG_ERROR_CORRUPT_STREAM,             // Corrupt stream
+    BROTLIG_ERROR_INCORRECT_STREAM_FORMAT,    // Incorrect stream format
+    BROTLIG_ERROR_HUFFMAN_TREE_SYMBOL_COUNT,  // Huffman tree table has an invalid number of symbols
+    BROTLIG_ERROR_HUFFMAN_TREE_INVALID_TYPE,  // Huffman tree table has an invalid tree type
     BROTLIG_ERROR_GENERIC
 } BROTLIG_ERROR;
 

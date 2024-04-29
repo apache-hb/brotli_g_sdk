@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -840,14 +840,14 @@ struct ConditionerParams
             gOffsets_subblocks[j] = 0;
             gOffsets_substreams[j] = 0;
             gColor_subblocks[j] = 0;
-            
+
             gMip_widths[j] = 0;
             gMip_heights[j] = 0;
             gMip_pitches[j] = 0;
             gOffsets_mipbytes[j] = 0;
             gOffsets_mipbytes[j] = 0;
         }
-        
+
         switch (format)
         {
         case 1:
@@ -1450,7 +1450,7 @@ void DeconditionLiterals(inout DecoderState d, uniform const uint wptr, uint num
         bool mask = laneIx >= endOffset && laneIx < written;
         endOffset = written % NUM_LANES;
         s_literalsKept = WaveReadLaneFirst((NUM_LANES - endOffset) % NUM_LANES);
-		
+
         uint daddr = DeconditionPtr(wptr + writeoff, dcparams);
 
         if (mask)
@@ -1710,7 +1710,7 @@ void Process(uint source, uint destination, uint inputSize, uint outputSize, Con
 
     if (Uncompressed(source, destination, inputSize, outputSize, dcparams, laneIx))
         return;
-        
+
     for (uint j = laneIx; j < DICTIONARY_COMPACT_TOTAL_SIZE; j += NUM_LANES)
         gDictionary[j] = 0;
 

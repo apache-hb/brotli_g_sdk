@@ -31,7 +31,9 @@
 
 #include "BrotligUtils.h"
 
+extern "C" {
 #include "c/common/constants.h"
+}
 
 #include "BrotligReverseBits.inl"
 

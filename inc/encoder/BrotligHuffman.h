@@ -21,9 +21,12 @@
 
 #include <cstdint>
 
+#include "BrotligCommon.h"
+
 namespace BrotliG
 {
     class BrotligSwizzler;
 
-    void BuildStoreHuffmanTable(uint32_t* hist, size_t alphabet_size, BrotligSwizzler& writer, uint16_t code[], uint8_t codelens[]);
+    [[nodiscard]]
+    BROTLIG_ERROR BuildStoreHuffmanTable(uint32_t* hist, size_t alphabet_size, BrotligSwizzler& writer, uint16_t code[], uint8_t codelens[]);
 }

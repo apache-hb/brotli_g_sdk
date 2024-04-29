@@ -19,9 +19,12 @@
 
 #pragma once
 
+#include "BrotligCommon.h"
+
 #include "common/BrotligDeswizzler.h"
 
 namespace BrotliG
 {
-    void LoadHuffmanTable(BrotligDeswizzler& reader, size_t alphabet_size, uint16_t symbols[], uint16_t codelens[]);
+    [[nodiscard]]
+    BROTLIG_ERROR LoadHuffmanTable(BrotligDeswizzler& reader, size_t alphabet_size, uint16_t symbols[], uint16_t codelens[]);
 }
