@@ -19,6 +19,7 @@
 
 
 #include <atomic>
+#include <mutex>
 #include <thread>
 
 #include "common/BrotligConstants.h"
@@ -226,7 +227,29 @@ namespace BrotliG
     };
 }
 
-static void PageDecoderJob(PageDecoderCtx& ctx, const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams)
+struct SpinLock
+{
+    std::atomic_flag flag = ATOMIC_FLAG_INIT;
+
+    void lock()
+    {
+        while (flag.test_and_set(std::memory_order_acquire))
+        {
+        }
+    }
+
+    bool try_lock()
+    {
+        return !flag.test_and_set(std::memory_order_acquire);
+    }
+
+    void unlock()
+    {
+        flag.clear(std::memory_order_release);
+    }
+};
+
+static void PageDecoderJob(PageDecoderCtx& ctx, const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams, SpinLock& lock)
 {
     PageDecoder pDecoder{params, dcParams};
 
@@ -249,23 +272,26 @@ static void PageDecoderJob(PageDecoderCtx& ctx, const BrotligDecoderParams& para
 
         if (ctx.feedbackProc)
         {
-            float progress = 100.f * ((float)(pageIndex) / ctx.numPages);
-            if (ctx.feedbackProc(BROTLIG_MESSAGE_TYPE::BROTLIG_PROGRESS, std::to_string(progress)))
+            if (auto guard = std::unique_lock{lock, std::try_to_lock})
             {
-                break;
+                float progress = 100.f * ((float)(pageIndex) / ctx.numPages);
+                if (ctx.feedbackProc(BROTLIG_MESSAGE_TYPE::BROTLIG_PROGRESS, std::to_string(progress)))
+                {
+                    break;
+                }
             }
         }
     }
 }
 
 static void DecodeCPUWithPreconMultiThread(
-    uint32_t input_size,
+    [[maybe_unused]] uint32_t input_size,
     const uint8_t* src,
     BrotligDecoderParams& params,
     BrotligDataconditionParams& dcParams,
     uint32_t numPages,
     uint32_t lastPageSize,
-    uint32_t output_size,
+    [[maybe_unused]] uint32_t output_size,
     uint8_t* output,
     BROTLIG_Feedback_Proc feedbackProc
 )
@@ -281,6 +307,9 @@ static void DecodeCPUWithPreconMultiThread(
     srcPtr += ctx.numPages * sizeof(uint32_t);
     ctx.inputPtr = srcPtr;
     ctx.outputPtr = outPtr;
+    ctx.feedbackProc = feedbackProc;
+
+    SpinLock lock; // synchronize the feedbackProcs output
 
     const uint32_t maxWorkers = std::min(static_cast<unsigned int>(BROTLIG_MAX_WORKERS), BrotliG::GetNumberOfProcessorsThreads());
     std::thread workers[BROTLIG_MAX_WORKERS];
@@ -291,11 +320,13 @@ static void DecodeCPUWithPreconMultiThread(
         if (numWorkersLeft == 1)
             break;
 
-        worker = std::thread([&ctx, &params, &dcParams]() {PageDecoderJob(ctx, params, dcParams); });
+        worker = std::thread([&] {
+            PageDecoderJob(ctx, params, dcParams, lock);
+        });
         --numWorkersLeft;
     }
 
-    PageDecoderJob(ctx, params, dcParams);
+    PageDecoderJob(ctx, params, dcParams, lock);
 
     for (auto& worker : workers)
     {
@@ -304,13 +335,14 @@ static void DecodeCPUWithPreconMultiThread(
     }
 }
 
+// TODO: validating the input and output sizes seems important
 static void DecodeCPUNoPreconMultiThread(
-    uint32_t input_size,
+    [[maybe_unused]] uint32_t input_size,
     const uint8_t* src,
     BrotligDecoderParams& params,
     uint32_t numPages,
     uint32_t lastPageSize,
-    uint32_t output_size,
+    [[maybe_unused]] uint32_t output_size,
     uint8_t* output,
     BROTLIG_Feedback_Proc feedbackProc
 )
@@ -326,8 +358,11 @@ static void DecodeCPUNoPreconMultiThread(
     srcPtr += ctx.numPages * sizeof(uint32_t);
     ctx.inputPtr = srcPtr;
     ctx.outputPtr = outPtr;
+    ctx.feedbackProc = feedbackProc;
 
     BrotligDataconditionParams dcParams = {};
+
+    SpinLock lock; // synchronize the feedbackProcs output
 
     const uint32_t maxWorkers = std::min(static_cast<unsigned int>(BROTLIG_MAX_WORKERS), BrotliG::GetNumberOfProcessorsThreads());
     std::thread workers[BROTLIG_MAX_WORKERS];
@@ -338,11 +373,13 @@ static void DecodeCPUNoPreconMultiThread(
         if (numWorkersLeft == 1)
             break;
 
-        worker = std::thread([&ctx, &params, &dcParams]() {PageDecoderJob(ctx, params, dcParams); });
+        worker = std::thread([&]() {
+            PageDecoderJob(ctx, params, dcParams, lock);
+        });
         --numWorkersLeft;
     }
 
-    PageDecoderJob(ctx, params, dcParams);
+    PageDecoderJob(ctx, params, dcParams, lock);
 
     for (auto& worker : workers)
     {

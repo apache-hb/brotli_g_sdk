@@ -189,7 +189,7 @@ void BuildHuffman(uint32_t* hist, size_t alphabet_size, uint16_t codes[], uint8_
     nodeList.clear();
 }
 
-static void StoreComplexHuffman(uint16_t codes[], uint8_t codelens[], size_t alphabet_size, BrotligSwizzler& writer)
+static void StoreComplexHuffman(uint8_t codelens[], size_t alphabet_size, BrotligSwizzler& writer)
 {
     uint8_t rle_codes[BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE], rle_extra_bits[BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE];
     size_t num_rle_codes = 0, num_rle_extra_bits = 0;
@@ -350,7 +350,7 @@ BROTLIG_ERROR BrotliG::BuildStoreHuffmanTable(
         writer.Append(2, 2);                                            // tree type
         writer.Append(4, BROTLI_CODE_LENGTH_CODES - 4);                 // nsym - 4
 
-        StoreComplexHuffman(codes, codelens, alphabet_size, writer);
+        StoreComplexHuffman(codelens, alphabet_size, writer);
 
         writer.BSReset();
     }

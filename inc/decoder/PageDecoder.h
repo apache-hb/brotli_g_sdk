@@ -58,7 +58,6 @@ namespace BrotliG
         bool Setup(const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams);
         bool DecodeCommand(BrotligCommand& cmd);
         uint8_t DecodeLiteral();
-        uint8_t DecodeNFetchLiteral(uint16_t& code, size_t& codelen);
         uint32_t DecodeDistance();
         void TranslateDistance(BrotligCommand& cmd);
 

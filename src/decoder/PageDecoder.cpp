@@ -349,15 +349,6 @@ uint8_t PageDecoder::DecodeLiteral()
     return (uint8_t)m_symbols[BROTLIG_LIT_TREE_INDEX][bits];
 }
 
-uint8_t PageDecoder::DecodeNFetchLiteral(uint16_t& code, size_t& codelen)
-{
-    code = static_cast<uint16_t>(m_pReader.ReadNoConsume15());
-    uint16_t bits = BrotligReverseBits15(code);
-    uint16_t lsymbol = m_symbols[BROTLIG_LIT_TREE_INDEX][bits];
-    m_pReader.Consume(m_codelens[BROTLIG_LIT_TREE_INDEX][bits]);
-    return (uint8_t)lsymbol;
-}
-
 uint32_t PageDecoder::DecodeDistance()
 {
     uint16_t bits = BrotligReverseBits15(m_pReader.ReadNoConsume15());
