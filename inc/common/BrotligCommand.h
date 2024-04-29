@@ -25,9 +25,9 @@
 
 #pragma once
 
-extern "C" {
-#include "c/enc/command.h"
-}
+#include <cstdint>
+
+typedef struct Command Command;
 
 namespace BrotliG
 {
@@ -35,37 +35,33 @@ namespace BrotliG
 
     struct BrotligCommand
     {
-        uint32_t insert_pos;
-        uint32_t insert_len;
-        uint32_t copy_len;
-        uint32_t dist_extra;
-        uint16_t cmd_prefix;
-        uint16_t dist_prefix;
-        uint32_t dist;
-        int32_t dist_code;
-
-        BrotligCommand();
-
-        Command* ToBroliCommand();
+        uint32_t insert_pos = 0;
+        uint32_t insert_len = 0;
+        uint32_t copy_len = 0;
+        uint32_t dist_extra = 0;
+        uint16_t cmd_prefix = 0;
+        uint16_t dist_prefix = 0;
+        uint32_t dist = 0;
+        int32_t dist_code = 0;
 
         void Copy(Command* in);
 
-        uint32_t CopyLen();
+        uint32_t CopyLen() const;
 
-        uint32_t DistanceContext();
+        uint32_t DistanceContext() const;
 
-        uint16_t Distance();
+        uint16_t Distance() const;
 
-        uint32_t CopyLenCode();
+        uint32_t CopyLenCode() const;
 
-        uint16_t InsertLengthCode();
+        uint16_t InsertLengthCode() const;
 
-        uint16_t GetCopyLengthCode(size_t copylen);
+        static uint16_t GetCopyLengthCode(size_t copylen);
 
-        void GetExtra(uint32_t& n_bits, uint64_t& bits);
+        void GetExtra(uint32_t& n_bits, uint64_t& bits) const;
 
-        void StoreExtra(BrotligBitWriterLSB* bw);
+        void StoreExtra(BrotligBitWriterLSB* bw) const;
 
-        uint16_t CombineLengthCodes(uint16_t inscode, uint16_t copycode, bool use_last_distance);
+        static uint16_t CombineLengthCodes(uint16_t inscode, uint16_t copycode, bool use_last_distance);
     };
 }

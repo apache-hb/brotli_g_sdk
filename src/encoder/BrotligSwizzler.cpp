@@ -17,19 +17,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+extern "C" {
+#include "c/enc/fast_log.h"
+}
+
 #include "BrotligConstants.h"
 #include "BrotligSwizzler.h"
 #include "common/BrotligUtils.h"
 #include "common/BrotligBitWriter.h"
-
-#include "c/enc/fast_log.h"
 
 using namespace BrotliG;
 
 BrotligSwizzler::BrotligSwizzler(size_t num_bitstreams, size_t bssizes)
 {
     m_headerStream.resize(bssizes, 0);
-    m_headerWriter = new BrotligBitWriterLSB;
+    m_headerWriter = std::make_unique<BrotligBitWriterLSB>();
     m_headerWriter->SetStorage(m_headerStream.data());
     m_headerWriter->SetPosition(0);
 
@@ -38,32 +40,15 @@ BrotligSwizzler::BrotligSwizzler(size_t num_bitstreams, size_t bssizes)
     for (size_t i = 0; i < num_bitstreams; ++i)
     {
         m_bitstreams.at(i) = std::vector<uint8_t>(bssizes, 0);
-        BrotligBitWriterLSB* bw = new BrotligBitWriterLSB;
+        std::unique_ptr bw = std::make_unique<BrotligBitWriterLSB>();
         bw->SetStorage(m_bitstreams.at(i).data());
         bw->SetPosition(0);
-        m_writers.at(i) = bw;
+        m_writers.at(i) = std::move(bw);
     }
 
     m_numbitstreams = num_bitstreams;
     m_curindex = 0;
 
-    m_outWriter = nullptr;
-    m_outSize = 0;
-}
-
-BrotligSwizzler::~BrotligSwizzler()
-{
-    m_headerStream.clear();
-    delete m_headerWriter;
-
-    for (size_t i = 0; i < m_numbitstreams; ++i)
-    {
-        delete m_writers.at(i);
-        m_bitstreams.at(i).clear();
-    }
-
-    m_writers.clear();
-    m_bitstreams.clear();
     m_outWriter = nullptr;
     m_outSize = 0;
 }

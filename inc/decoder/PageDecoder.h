@@ -21,6 +21,9 @@
 #include "common/BrotligDeswizzler.h"
 #include "common/BrotligDataConditioner.h"
 
+#include <memory>
+#include <array>
+
 namespace BrotliG
 {
     struct BrotligCommand;
@@ -47,29 +50,26 @@ namespace BrotliG
     class PageDecoder
     {
     public:
-        PageDecoder();
-        ~PageDecoder();
+        PageDecoder(const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams);
 
-        bool Setup(const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams);
         bool Run(const uint8_t* input, size_t inputSize, size_t inputOffset, uint8_t* output, size_t outputSize, size_t outputOffset);
-        void Cleanup();
 
     private:
-        inline bool DecodeCommand(BrotligCommand& cmd);
-        inline uint8_t DecodeLiteral();
+        bool Setup(const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams);
+        bool DecodeCommand(BrotligCommand& cmd);
+        uint8_t DecodeLiteral();
         uint8_t DecodeNFetchLiteral(uint16_t& code, size_t& codelen);
-        inline uint32_t DecodeDistance();
-        inline void TranslateDistance(BrotligCommand& cmd);
+        uint32_t DecodeDistance();
+        void TranslateDistance(BrotligCommand& cmd);
 
-        inline uint32_t DeconditionBC1_5(uint32_t offsetAddr, uint32_t sub);
+        uint32_t DeconditionBC1_5(uint32_t offsetAddr, uint32_t sub);
         void DeltaDecode(size_t page_start, size_t page_end, uint8_t* input);
-        void DeltaDecodeByte(size_t inSize, uint8_t* inData);
 
         BrotligDecoderParams m_params;
         BrotligDataconditionParams m_dcparams;
 
-        uint16_t* m_symbols[BROTLIG_NUM_HUFFMAN_TREES];
-        uint16_t* m_codelens[BROTLIG_NUM_HUFFMAN_TREES];
+        std::array<std::unique_ptr<uint16_t[]>, BROTLIG_NUM_HUFFMAN_TREES> m_symbols;
+        std::array<std::unique_ptr<uint16_t[]>, BROTLIG_NUM_HUFFMAN_TREES> m_codelens;
 
         uint32_t m_distring[4];
 

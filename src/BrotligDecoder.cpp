@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -18,7 +18,7 @@
 // THE SOFTWARE.
 
 
-#include <iostream>
+#include <atomic>
 #include <thread>
 
 #include "common/BrotligConstants.h"
@@ -38,87 +38,8 @@ uint32_t BROTLIG_API BrotliG::DecompressedSize(uint8_t* src)
     return static_cast<uint32_t>(sheader->UncompressedSize());
 }
 
-namespace BrotliG {
-    struct PageDecoderCtx
-    {
-        const uint8_t* inputPtr;
-        uint8_t* outputPtr;
-
-        const uint32_t* pageTable;
-        uint32_t numPages;
-
-        uint32_t lastPageSize;
-
-        std::atomic_uint32_t globalIndex;
-
-        BROTLIG_Feedback_Proc feedbackProc;
-
-        PageDecoderCtx()
-        {
-            inputPtr = nullptr;
-            outputPtr = nullptr;
-
-            pageTable = nullptr;
-            numPages = 0;
-
-            lastPageSize = 0;
-
-            feedbackProc = nullptr;
-        }
-
-        ~PageDecoderCtx()
-        {
-            inputPtr = nullptr;
-            outputPtr = nullptr;
-
-            pageTable = nullptr;
-            numPages = 0;
-
-            lastPageSize = 0;
-
-            feedbackProc = nullptr;
-        }
-    };
-
-    struct BlockDeconditionerCtx
-    {
-        uint8_t* inputPtr;
-        uint8_t* outputPtr;
-
-        uint8_t* blockModes;
-        uint32_t suboffsets[BROTLIG_MAX_NUM_SUB_BLOCKS] = { 0 };
-        uint32_t* subblockoffsets[BROTLIG_MAX_NUM_SUB_BLOCKS - 1] = { nullptr };
-        uint32_t numBlocks;
-
-        std::atomic_uint32_t globalIndex;
-
-        BROTLIG_Feedback_Proc feedbackProc;
-
-        BlockDeconditionerCtx()
-        {
-            inputPtr = nullptr;
-            outputPtr = nullptr;
-
-            blockModes = nullptr;
-            numBlocks = 0;
-
-            feedbackProc = nullptr;
-        }
-
-        ~BlockDeconditionerCtx()
-        {
-            inputPtr = nullptr;
-            outputPtr = nullptr;
-
-            blockModes = nullptr;
-            numBlocks = 0;
-
-            feedbackProc = nullptr;
-        }
-    };
-}
-
-void DecodeCPUWithPreconSingleThread(
+#if !BROTLIG_CPU_DECODER_MULTITHREADING_MODE
+static void DecodeCPUWithPreconSingleThread(
     uint32_t input_size,
     const uint8_t* src,
     BrotligDecoderParams& params,
@@ -132,14 +53,12 @@ void DecodeCPUWithPreconSingleThread(
 {
     const uint8_t* srcPtr = src;
     uint8_t* outPtr = output;
-    uint32_t outSize = output_size;
 
     // Read the page table
     const uint32_t* pageTable = reinterpret_cast<const uint32_t*>(srcPtr);
     srcPtr += numPages * sizeof(uint32_t);
 
-    PageDecoder pDecoder;
-    pDecoder.Setup(params, dcParams);
+    PageDecoder pDecoder{params, dcParams};
 
     uint32_t pageIndex = 0;
     uint32_t curInOffset = 0, curOutOffset = 0;
@@ -166,11 +85,9 @@ void DecodeCPUWithPreconSingleThread(
 
         ++pageIndex;
     }
-
-    pDecoder.Cleanup();
 }
 
-void DecodeCPUNoPreconSingleThread(
+static void DecodeCPUNoPreconSingleThread(
     uint32_t input_size,
     const uint8_t* src,
     BrotligDecoderParams& params,
@@ -184,7 +101,6 @@ void DecodeCPUNoPreconSingleThread(
     const uint8_t* srcPtr = src;
 
     uint8_t* outPtr = output;
-    uint32_t outSize = output_size;
 
     // Read the page table
     const uint32_t* pageTable = reinterpret_cast<const uint32_t*>(srcPtr);
@@ -192,8 +108,7 @@ void DecodeCPUNoPreconSingleThread(
 
     BrotligDataconditionParams dcParams = {};
 
-    PageDecoder pDecoder;
-    pDecoder.Setup(params, dcParams);
+    PageDecoder pDecoder{params, dcParams};
 
     uint32_t pageIndex = 0;
     uint32_t curInOffset = 0, curOutOffset = 0;
@@ -220,17 +135,16 @@ void DecodeCPUNoPreconSingleThread(
 
         ++pageIndex;
     }
-
-    pDecoder.Cleanup();
 }
 
-BROTLIG_ERROR DecodeCPUSingleThreaded(
+[[nodiscard]]
+static BROTLIG_ERROR DecodeCPUSingleThreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
     uint8_t* output,
     BROTLIG_Feedback_Proc feedbackProc)
-{  
+{
     const uint8_t* srcPtr = src;
     uint32_t srcSize = input_size;
 
@@ -258,7 +172,6 @@ BROTLIG_ERROR DecodeCPUSingleThreaded(
     uint32_t lastPageSize = sHeader->LastPageSize;
     uint32_t numPages = sHeader->NumPages;
 
-    uint8_t* outPtr = output;
     uint32_t outSize = (uint32_t)sHeader->UncompressedSize();
 
     srcPtr += sizeof(StreamHeader);
@@ -275,7 +188,7 @@ BROTLIG_ERROR DecodeCPUSingleThreaded(
         dcParams.format = preHeader->DataFormat();
         dcParams.numMipLevels = preHeader->NumMips + 1;
         dcParams.pitchInBytes[0] = preHeader->PitchInBytes + 1;
-        
+
         dcParams.Initialize(*output_size);
 
         srcPtr += sizeof(PreconditionHeader);
@@ -293,10 +206,29 @@ BROTLIG_ERROR DecodeCPUSingleThreaded(
     return BROTLIG_OK;
 }
 
+#else
+
+namespace BrotliG
+{
+    struct PageDecoderCtx
+    {
+        const uint8_t* inputPtr = nullptr;
+        uint8_t* outputPtr = nullptr;
+
+        const uint32_t* pageTable = nullptr;
+        uint32_t numPages = 0;
+
+        uint32_t lastPageSize = 0;
+
+        std::atomic_uint32_t globalIndex = 0;
+
+        BROTLIG_Feedback_Proc feedbackProc = nullptr;
+    };
+}
+
 static void PageDecoderJob(PageDecoderCtx& ctx, const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams)
 {
-    PageDecoder pDecoder;
-    pDecoder.Setup(params, dcParams);
+    PageDecoder pDecoder{params, dcParams};
 
     uint32_t curInOffset = 0, curOutOffset = 0;
     size_t inPageSize = 0, outPageSize = 0;
@@ -324,11 +256,9 @@ static void PageDecoderJob(PageDecoderCtx& ctx, const BrotligDecoderParams& para
             }
         }
     }
-
-    pDecoder.Cleanup();
 }
 
-void DecodeCPUWithPreconMultiThread(
+static void DecodeCPUWithPreconMultiThread(
     uint32_t input_size,
     const uint8_t* src,
     BrotligDecoderParams& params,
@@ -342,7 +272,6 @@ void DecodeCPUWithPreconMultiThread(
 {
     const uint8_t* srcPtr = src;
     uint8_t* outPtr = output;
-    uint32_t outSize = output_size;
 
     PageDecoderCtx ctx{};
     ctx.globalIndex = 0;
@@ -375,7 +304,7 @@ void DecodeCPUWithPreconMultiThread(
     }
 }
 
-void DecodeCPUNoPreconMultiThread(
+static void DecodeCPUNoPreconMultiThread(
     uint32_t input_size,
     const uint8_t* src,
     BrotligDecoderParams& params,
@@ -388,7 +317,6 @@ void DecodeCPUNoPreconMultiThread(
 {
     const uint8_t* srcPtr = src;
     uint8_t* outPtr = output;
-    uint32_t outSize = output_size;
 
     PageDecoderCtx ctx{};
     ctx.globalIndex = 0;
@@ -423,7 +351,8 @@ void DecodeCPUNoPreconMultiThread(
     }
 }
 
-BROTLIG_ERROR DecodeCPUMultithreaded(
+[[nodiscard]]
+static BROTLIG_ERROR DecodeCPUMultithreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
@@ -457,7 +386,6 @@ BROTLIG_ERROR DecodeCPUMultithreaded(
     uint32_t lastPageSize = sHeader->LastPageSize;
     uint32_t numPages = sHeader->NumPages;
 
-    uint8_t* outPtr = output;
     uint32_t outSize = (uint32_t)sHeader->UncompressedSize();
 
     srcPtr += sizeof(StreamHeader);
@@ -491,7 +419,9 @@ BROTLIG_ERROR DecodeCPUMultithreaded(
 
     return BROTLIG_OK;
 }
+#endif
 
+[[nodiscard]]
 BROTLIG_ERROR BROTLIG_API BrotliG::DecodeCPU(
     uint32_t input_size,
     const uint8_t* src,

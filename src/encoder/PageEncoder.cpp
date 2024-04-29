@@ -25,10 +25,7 @@
 
 extern "C" {
 #include "c/common/context.h"
-}
-
 #include "c/common/transform.h"
-
 #include "c/enc/command.h"
 #include "c/enc/hash.h"
 #include "c/enc/quality.h"
@@ -41,6 +38,7 @@ extern "C" {
 #include "c/enc/bit_cost.h"
 
 #include "brotli/encode.h"
+}
 
 #include "BrotligSwizzler.h"
 #include "common/BrotligDataConditioner.h"
@@ -444,17 +442,6 @@ bool BrotligEncoderState::EnsureInitialized()
     return BROTLI_TRUE;
 }
 
-PageEncoder::PageEncoder()
-{
-    m_state = nullptr;
-    m_dcparams = nullptr;
-}
-
-PageEncoder::~PageEncoder()
-{
-    Cleanup();
-}
-
 bool PageEncoder::Setup(BrotligEncoderParams& params, BrotligDataconditionParams* dcparams)
 {
     m_params = params;
@@ -484,24 +471,23 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     uint8_t* p_outPtr = output + outputOffset;
 
     // Create encoder instance
-    m_state = new BrotligEncoderState(0, 0, 0);
-    if (!m_state) return false;
+    std::unique_ptr state = std::make_unique<BrotligEncoderState>(nullptr, nullptr, nullptr);
 
-    m_state->SetParameter(BROTLI_PARAM_QUALITY, (uint32_t)m_params.quality);
-    m_state->SetParameter(BROTLI_PARAM_LGWIN, (uint32_t)m_params.lgwin);
-    m_state->SetParameter(BROTLI_PARAM_MODE, (uint32_t)m_params.mode);
-    m_state->SetParameter(BROTLI_PARAM_SIZE_HINT, (uint32_t)inSize);
+    state->SetParameter(BROTLI_PARAM_QUALITY, (uint32_t)m_params.quality);
+    state->SetParameter(BROTLI_PARAM_LGWIN, (uint32_t)m_params.lgwin);
+    state->SetParameter(BROTLI_PARAM_MODE, (uint32_t)m_params.mode);
+    state->SetParameter(BROTLI_PARAM_SIZE_HINT, (uint32_t)inSize);
 
     if (m_params.lgwin > BROTLI_MAX_WINDOW_BITS) {
-        m_state->SetParameter(BROTLI_PARAM_LARGE_WINDOW, BROTLI_TRUE);
+        state->SetParameter(BROTLI_PARAM_LARGE_WINDOW, BROTLI_TRUE);
     }
 
-    if (!m_state->EnsureInitialized())
+    if (!state->EnsureInitialized())
         return false;
 
     // Generate LZ77 commands
     ContextType literal_context_mode = ChooseContextMode(
-        &m_state->params,
+        &state->params,
         p_inPtr,
         0,
         BROTLIG_INPUT_BIT_MASK,
@@ -511,7 +497,7 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     ContextLut literal_context_lut = BROTLI_CONTEXT_LUT(literal_context_mode);
 
     BrotligCreateHqZopfliBackwardReferences(
-        m_state,
+        state.get(),
         p_inPtr,
         inSize,
         literal_context_lut,
@@ -524,15 +510,11 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
         BROTLIG_INPUT_BIT_MASK,
         0,
         inSize,
-        m_state->num_literals_,
-        m_state->num_commands_
+        state->num_literals_,
+        state->num_commands_
     ))
     {
-        // If not compressible, destroy encoder instance,
-        // copy input directly to output and return
-        delete m_state;
-        m_state = nullptr;
-
+        // If not compressible, copy input directly to output and return
         if (Isdeltaencoded)
             delete[] p_inPtr;
 
@@ -543,8 +525,8 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     uint32_t ndirect_msb = 0, ndirect = 0;
     bool skip = false, check_orig = true;
     double dist_cost = 0.0, best_dist_cost = 1e99;
-    BrotliEncoderParams orig_params = m_state->params;
-    BrotliEncoderParams new_params = m_state->params;
+    BrotliEncoderParams orig_params = state->params;
+    BrotliEncoderParams new_params = state->params;
     for (uint32_t npostfix = 0; npostfix <= BROTLI_MAX_NPOSTFIX; ++npostfix)
     {
         for (; ndirect_msb < 16; ++ndirect_msb)
@@ -556,8 +538,8 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
                 check_orig = false;
 
             skip = !BrotligComputeDistanceCost(
-                m_state->commands_,
-                m_state->num_commands_,
+                state->commands_,
+                state->num_commands_,
                 &orig_params.dist,
                 &new_params.dist,
                 &dist_cost
@@ -567,7 +549,7 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
                 break;
 
             best_dist_cost = dist_cost;
-            m_state->params.dist = new_params.dist;
+            state->params.dist = new_params.dist;
         }
 
         if (ndirect_msb > 0) --ndirect_msb;
@@ -577,21 +559,21 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     if (check_orig)
     {
         BrotligComputeDistanceCost(
-            m_state->commands_,
-            m_state->num_commands_,
+            state->commands_,
+            state->num_commands_,
             &orig_params.dist,
             &orig_params.dist,
             &dist_cost
         );
 
-        if (dist_cost < best_dist_cost) m_state->params.dist = orig_params.dist;
+        if (dist_cost < best_dist_cost) state->params.dist = orig_params.dist;
     }
 
     BrotligRecomputeDistancePrefixes(
-        m_state->commands_,
-        m_state->num_commands_,
+        state->commands_,
+        state->num_commands_,
         &orig_params.dist,
-        &m_state->params.dist
+        &state->params.dist
     );
 
     // Compute Histograms
@@ -602,16 +584,17 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     size_t cmdIndex = 0, pos = 0, numbitstreams = m_params.num_bitstreams;
     Command cmd;
     uint32_t insertLen = 0, distContext = 0;
-    uint8_t* litqueue = new uint8_t[inSize];
-    uint8_t* litqfront = litqueue;
-    uint8_t* litqback = litqueue;
+
+    std::unique_ptr litqueue = std::make_unique<uint8_t[]>(inSize);
+    uint8_t* litqfront = litqueue.get();
+    uint8_t* litqback = litqueue.get();
 
     HistogramDistance distCtxHists[BROTLIG_NUM_DIST_CONTEXT_HISTOGRAMS];
     ClearHistogramsDistance(distCtxHists, BROTLIG_NUM_DIST_CONTEXT_HISTOGRAMS);
 
-    while (cmdIndex < m_state->num_commands_)
+    while (cmdIndex < state->num_commands_)
     {
-        cmd = m_state->commands_[cmdIndex++];
+        cmd = state->commands_[cmdIndex++];
         ++m_histCommands[cmd.cmd_prefix_];
         if ((cmd.copy_len_ & 0x1FFFFFF) &&
             (cmd.cmd_prefix_ >= 128 && cmd.cmd_prefix_ < BROTLI_NUM_COMMAND_SYMBOLS))
@@ -632,7 +615,7 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     size_t num_out = 0;
     uint32_t dist_context_map[BROTLIG_NUM_DIST_CONTEXT_HISTOGRAMS];
     BrotliClusterHistogramsDistance(
-        &m_state->memory_manager_,
+        &state->memory_manager_,
         distCtxHists,
         BROTLIG_NUM_DIST_CONTEXT_HISTOGRAMS,
         BROTLIG_MAX_NUM_DIST_HISTOGRAMS,
@@ -644,7 +627,7 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     memcpy(m_histDistances, out[0].data_, sizeof(out[0].data_));
 
     // Optimize Histograms
-    if (m_state->params.quality >= MIN_QUALITY_FOR_OPTIMIZE_HISTOGRAMS)
+    if (state->params.quality >= MIN_QUALITY_FOR_OPTIMIZE_HISTOGRAMS)
     {
         uint8_t good_for_rle[BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE];
         BrotliOptimizeHuffmanCountsForRle(BROTLI_NUM_LITERAL_SYMBOLS, m_histLiterals, good_for_rle);
@@ -660,42 +643,55 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     bw.SetStorage(p_outPtr);
     bw.SetPosition(0);
 
-    m_pWriter = new BrotligSwizzler(m_params.num_bitstreams, m_params.page_size);
+    m_pWriter = std::make_unique<BrotligSwizzler>(m_params.num_bitstreams, m_params.page_size);
     m_pWriter->SetOutWriter(&bw, *outputSize);
 
-    // Build and Store Huffman tables
-    BuildStoreHuffmanTable(
-        m_histCommands,
-        BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE,
-        *m_pWriter,
-        m_cmdCodes,
-        m_cmdCodelens
-    );
+    {
+        BROTLIG_ERROR result;
 
-    BuildStoreHuffmanTable(
-        m_histDistances,
-        BROTLIG_NUM_DISTANCE_SYMBOLS,
-        *m_pWriter,
-        m_distCodes,
-        m_distCodelens
-    );
+        // Build and Store Huffman tables
+        result = BuildStoreHuffmanTable(
+            m_histCommands,
+            BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE,
+            *m_pWriter,
+            m_cmdCodes,
+            m_cmdCodelens
+        );
 
-    BuildStoreHuffmanTable(
-        m_histLiterals,
-        BROTLI_NUM_LITERAL_SYMBOLS,
-        *m_pWriter,
-        m_litCodes,
-        m_litCodelens
-    );
+        if (result != BROTLIG_OK)
+            return false;
+
+        result = BuildStoreHuffmanTable(
+            m_histDistances,
+            BROTLIG_NUM_DISTANCE_SYMBOLS,
+            *m_pWriter,
+            m_distCodes,
+            m_distCodelens
+        );
+
+        if (result != BROTLIG_OK)
+            return false;
+
+        result = BuildStoreHuffmanTable(
+            m_histLiterals,
+            BROTLI_NUM_LITERAL_SYMBOLS,
+            *m_pWriter,
+            m_litCodes,
+            m_litCodelens
+        );
+
+        if (result != BROTLIG_OK)
+            return false;
+    }
 
     // Encode and store commands and literals
     cmdIndex = 0;
     size_t bsindex = 0;
 
-    size_t nRounds = (m_state->num_commands_ + numbitstreams - 1) / numbitstreams;
-    Command* cqfront = m_state->commands_;
+    size_t nRounds = (state->num_commands_ + numbitstreams - 1) / numbitstreams;
+    Command* cqfront = state->commands_;
     size_t litcount = 0, aclitcount = 0, mult = 0, rlitcount = 0, prev_tail = 0;
-    size_t effNumbitstreams = (m_state->num_commands_ >= numbitstreams) ? numbitstreams : m_state->num_commands_;
+    size_t effNumbitstreams = (state->num_commands_ >= numbitstreams) ? numbitstreams : state->num_commands_;
 
     while (nRounds--)
     {
@@ -727,7 +723,7 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
 
         m_pWriter->BSReset();
 
-        effNumbitstreams = (m_state->num_commands_ >= numbitstreams) ? numbitstreams : m_state->num_commands_;
+        effNumbitstreams = (state->num_commands_ >= numbitstreams) ? numbitstreams : state->num_commands_;
         aclitcount = (litcount > prev_tail) ? litcount - prev_tail : 0;
         mult = (aclitcount + effNumbitstreams - 1) / effNumbitstreams;
         rlitcount = effNumbitstreams * mult;
@@ -751,11 +747,9 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
         m_pWriter->BSReset();
     }
 
-    delete[] litqueue;
-
     // Store header
-    m_pWriter->AppendToHeader(BROTLIG_PAGE_HEADER_NPOSTFIX_BITS, m_state->params.dist.distance_postfix_bits);
-    m_pWriter->AppendToHeader(BROTLIG_PAGE_HEADER_NDIST_BITS, m_state->params.dist.num_direct_distance_codes >> m_state->params.dist.distance_postfix_bits);
+    m_pWriter->AppendToHeader(BROTLIG_PAGE_HEADER_NPOSTFIX_BITS, state->params.dist.distance_postfix_bits);
+    m_pWriter->AppendToHeader(BROTLIG_PAGE_HEADER_NDIST_BITS, state->params.dist.num_direct_distance_codes >> state->params.dist.distance_postfix_bits);
     m_pWriter->AppendToHeader(BROTLIG_PAGE_HEADER_ISDELTAENCODED_BITS, Isdeltaencoded);
     m_pWriter->AppendToHeader(BROTLIG_PAGE_HEADER_RESERVED_BITS, 0);
 
@@ -768,11 +762,6 @@ bool PageEncoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
 
     if (Isdeltaencoded)
         delete[] p_inPtr;
-
-    delete m_pWriter;
-
-    delete m_state;
-    m_state = nullptr;
 
     size_t newsize = (bw.GetPosition() + 8 - 1) / 8;
 
@@ -860,13 +849,4 @@ void PageEncoder::StoreDistance(uint16_t dist_prefix, uint32_t distextra)
     uint32_t distnumextra = dist_prefix >> 10;
     m_pWriter->Append(nbits, m_distCodes[dist_code]);
     m_pWriter->Append(distnumextra, distextra);
-}
-
-void PageEncoder::Cleanup()
-{
-    if (m_state != nullptr)
-    {
-        delete m_state;
-        m_state = nullptr;
-    }
 }

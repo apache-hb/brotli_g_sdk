@@ -62,53 +62,9 @@ BROTLIG_ERROR BROTLIG_API BrotliG::CheckParams(uint32_t page_size, BrotligDataco
     return BROTLIG_OK;
 }
 
-namespace BrotliG {
-    struct PageEncoderCtx
-    {
-        const uint8_t* inputPtr;
-        uint8_t* outputPtr;
-
-        size_t* outPageSizes;
-        uint32_t numPages;
-
-        uint32_t maxOutPageSize;
-        uint32_t lastPageSize;
-
-        std::atomic_uint32_t globalIndex;
-
-        BROTLIG_Feedback_Proc feedbackProc;
-
-        PageEncoderCtx()
-        {
-            inputPtr = nullptr;
-            outputPtr = nullptr;
-
-            outPageSizes = nullptr;
-            numPages = 0;
-
-            maxOutPageSize = 0;
-            lastPageSize = 0;
-
-            feedbackProc = nullptr;
-        }
-
-        ~PageEncoderCtx()
-        {
-            inputPtr = nullptr;
-            outputPtr = nullptr;
-
-            outPageSizes = nullptr;
-            numPages = 0;
-
-            maxOutPageSize = 0;
-            lastPageSize = 0;
-
-            feedbackProc = nullptr;
-        }
-    };
-}
-
-void EncodeWithPreconSinglethreaded(
+#if !BROTLIG_ENCODER_MULTITHREADING_MODE
+[[nodiscard]]
+static BROTLIG_ERROR EncodeWithPreconSinglethreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
@@ -121,12 +77,13 @@ void EncodeWithPreconSinglethreaded(
     uint8_t* srcConditioned = nullptr;
     uint32_t srcCondSize = 0;
 
-    BrotliG::Condition(input_size, src, dcParams, srcCondSize, srcConditioned);
+    if (!BrotliG::Condition(input_size, src, dcParams, srcCondSize, srcConditioned))
+        return BROTLIG_ERROR_PRECON_INCORRECT_FORMAT;
 
     uint32_t numPages = (srcCondSize + page_size - 1) / page_size;
 
     size_t maxOutPageSize = PageEncoder::MaxCompressedSize(page_size);
-    uint8_t* tOutput = new uint8_t[maxOutPageSize * numPages];
+    std::unique_ptr tOutput = new std::unique_ptr<uint8_t[]>(maxOutPageSize * numPages);
     size_t* tOutpageSizes = new size_t[numPages];
 
     std::vector<size_t> outputPageSize(numPages);
@@ -226,9 +183,12 @@ void EncodeWithPreconSinglethreaded(
     delete[] srcConditioned;
 
     *output_size = (uint32_t)tcompressedSize;
+
+    return BROTLIG_OK;
 }
 
-void EncodeNoPreconSinglethreaded(
+[[nodiscard]]
+static BROTLIG_ERROR EncodeNoPreconSinglethreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
@@ -326,9 +286,13 @@ void EncodeNoPreconSinglethreaded(
     delete[] tOutput;
 
     *output_size = (uint32_t)tcompressedSize;
+
+    return BROTLIG_OK;
 }
 
-BROTLIG_ERROR EncodeSinglethreaded(
+
+[[nodiscard]]
+static BROTLIG_ERROR EncodeSinglethreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
@@ -356,7 +320,8 @@ BROTLIG_ERROR EncodeSinglethreaded(
     }
 
     if (dcParams.precondition)
-        EncodeWithPreconSinglethreaded(
+    {
+        return EncodeWithPreconSinglethreaded(
             input_size,
             src,
             output_size,
@@ -365,8 +330,10 @@ BROTLIG_ERROR EncodeSinglethreaded(
             dcParams,
             feedbackProc
         );
+    }
     else
-      EncodeNoPreconSinglethreaded(
+    {
+      return EncodeNoPreconSinglethreaded(
             input_size,
             src,
             output_size,
@@ -374,8 +341,56 @@ BROTLIG_ERROR EncodeSinglethreaded(
             page_size,
             feedbackProc
         );
+    }
+}
 
-    return BROTLIG_OK;
+#else
+
+namespace BrotliG
+{
+    struct PageEncoderCtx
+    {
+        const uint8_t* inputPtr;
+        uint8_t* outputPtr;
+
+        size_t* outPageSizes;
+        uint32_t numPages;
+
+        uint32_t maxOutPageSize;
+        uint32_t lastPageSize;
+
+        std::atomic_uint32_t globalIndex;
+
+        BROTLIG_Feedback_Proc feedbackProc;
+
+        PageEncoderCtx()
+        {
+            inputPtr = nullptr;
+            outputPtr = nullptr;
+
+            outPageSizes = nullptr;
+            numPages = 0;
+
+            maxOutPageSize = 0;
+            lastPageSize = 0;
+
+            feedbackProc = nullptr;
+        }
+
+        ~PageEncoderCtx()
+        {
+            inputPtr = nullptr;
+            outputPtr = nullptr;
+
+            outPageSizes = nullptr;
+            numPages = 0;
+
+            maxOutPageSize = 0;
+            lastPageSize = 0;
+
+            feedbackProc = nullptr;
+        }
+    };
 }
 
 static void PageEncoderJob(PageEncoderCtx& ctx, BrotligEncoderParams& params, BrotligDataconditionParams& dcParams)
@@ -409,11 +424,10 @@ static void PageEncoderJob(PageEncoderCtx& ctx, BrotligEncoderParams& params, Br
             }
         }
     }
-
-    pEncoder.Cleanup();
 }
 
-void EncodeWithPreconMultithreaded(
+[[nodiscard]]
+static BROTLIG_ERROR EncodeWithPreconMultithreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
@@ -426,7 +440,8 @@ void EncodeWithPreconMultithreaded(
     uint8_t* srcConditioned = nullptr;
     uint32_t srcCondSize = 0;
 
-    BrotliG::Condition(input_size, src, dcParams, srcCondSize, srcConditioned);
+    if (!BrotliG::Condition(input_size, src, dcParams, srcCondSize, srcConditioned))
+        return BROTLIG_ERROR_INCORRECT_STREAM_FORMAT;
 
     size_t maxOutPageSize = PageEncoder::MaxCompressedSize(page_size);
 
@@ -521,9 +536,12 @@ void EncodeWithPreconMultithreaded(
     delete[] srcConditioned;
 
     *output_size = (uint32_t)tcompressedSize;
+
+    return BROTLIG_OK;
 }
 
-void EncodeNoPreconMultithreaded(
+[[nodiscard]]
+static BROTLIG_ERROR EncodeNoPreconMultithreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
@@ -609,9 +627,12 @@ void EncodeNoPreconMultithreaded(
     delete[] ctx.outputPtr;
 
     *output_size = (uint32_t)tcompressedSize;
+
+    return BROTLIG_OK;
 }
 
-BROTLIG_ERROR EncodeMultithreaded(
+[[nodiscard]]
+static BROTLIG_ERROR EncodeMultithreaded(
     uint32_t input_size,
     const uint8_t* src,
     uint32_t* output_size,
@@ -639,7 +660,8 @@ BROTLIG_ERROR EncodeMultithreaded(
     }
 
     if (dcParams.precondition)
-        EncodeWithPreconMultithreaded(
+    {
+        return EncodeWithPreconMultithreaded(
             input_size,
             src,
             output_size,
@@ -648,8 +670,10 @@ BROTLIG_ERROR EncodeMultithreaded(
             dcParams,
             feedbackProc
         );
+    }
     else
-        EncodeNoPreconMultithreaded(
+    {
+        return EncodeNoPreconMultithreaded(
             input_size,
             src,
             output_size,
@@ -657,10 +681,11 @@ BROTLIG_ERROR EncodeMultithreaded(
             page_size,
             feedbackProc
         );
-
-    return BROTLIG_OK;
+    }
 }
+#endif
 
+[[nodiscard]]
 BROTLIG_ERROR BROTLIG_API BrotliG::Encode(
     uint32_t input_size,
     const uint8_t* src,

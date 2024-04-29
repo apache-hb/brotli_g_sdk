@@ -18,6 +18,12 @@
 // THE SOFTWARE.
 
 
+extern "C" {
+#include "c/enc/command.h"
+#include "c/enc/fast_log.h"
+#include "brotli/encode.h"
+}
+
 #include "common/BrotligDataConditioner.h"
 #include "common/BrotligCommand.h"
 
@@ -25,8 +31,11 @@
 
 #include "BrotligBitReader.h"
 #include "PageDecoder.h"
+#include "BrotligUtils.h"
 
 #include "BrotligCommandLut.inl"
+
+#include <memory>
 
 using namespace BrotliG;
 
@@ -66,20 +75,10 @@ BrotligDecoderParams& BrotligDecoderParams::operator=(const BrotligDecoderParams
     return *this;
 }
 
-PageDecoder::PageDecoder()
+PageDecoder::PageDecoder(const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams)
 {
-    for (size_t i = 0; i < BROTLIG_NUM_HUFFMAN_TREES; ++i)
-    {
-        m_symbols[i] = nullptr;
-        m_codelens[i] = nullptr;
-    }
-
+    Setup(params, dcParams);
     m_distring[0] = m_distring[1] = m_distring[2] = m_distring[3] = 0;
-}
-
-PageDecoder::~PageDecoder()
-{
-    Cleanup();
 }
 
 bool PageDecoder::Setup(const BrotligDecoderParams& params, const BrotligDataconditionParams& dcParams)
@@ -87,14 +86,12 @@ bool PageDecoder::Setup(const BrotligDecoderParams& params, const BrotligDatacon
     m_params = params;
     m_dcparams = dcParams;
 
-    m_pReader.Initialize(
-        m_params.num_bitstreams
-    );
+    m_pReader.Initialize(m_params.num_bitstreams);
 
     for (size_t i = 0; i < BROTLIG_NUM_HUFFMAN_TREES; ++i)
     {
-        m_symbols[i] = new uint16_t[BROTLIG_HUFFMAN_TABLE_SIZE];
-        m_codelens[i] = new uint16_t[BROTLIG_HUFFMAN_TABLE_SIZE];
+        m_symbols[i] = std::make_unique<uint16_t[]>(BROTLIG_HUFFMAN_TABLE_SIZE);
+        m_codelens[i] = std::make_unique<uint16_t[]>(BROTLIG_HUFFMAN_TABLE_SIZE);
     }
 
     return true;
@@ -159,31 +156,41 @@ bool PageDecoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
         }
 
         m_pReader.BSReset();
+        {
+            BROTLIG_ERROR result;
+            // Load insert-and-copy lengths huffman table
+            result = LoadHuffmanTable(
+                m_pReader,
+                BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE,
+                m_symbols[BROTLIG_ICP_TREE_INDEX].get(),
+                m_codelens[BROTLIG_ICP_TREE_INDEX].get()
+            );
 
-        // Load insert-and-copy lengths huffman table
-        LoadHuffmanTable(
-            m_pReader,
-            BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE,
-            m_symbols[BROTLIG_ICP_TREE_INDEX],
-            m_codelens[BROTLIG_ICP_TREE_INDEX]
-        );
+            if (result != BROTLIG_OK)
+                return false;
 
-        // Load distance huffman table
-        LoadHuffmanTable(
-            m_pReader,
-            BROTLIG_NUM_DISTANCE_SYMBOLS,
-            m_symbols[BROTLIG_DIST_TREE_INDEX],
-            m_codelens[BROTLIG_DIST_TREE_INDEX]
-        );
+            // Load distance huffman table
+            result = LoadHuffmanTable(
+                m_pReader,
+                BROTLIG_NUM_DISTANCE_SYMBOLS,
+                m_symbols[BROTLIG_DIST_TREE_INDEX].get(),
+                m_codelens[BROTLIG_DIST_TREE_INDEX].get()
+            );
 
-        // Load literal huffman table
-        LoadHuffmanTable(
-            m_pReader,
-            BROTLI_NUM_LITERAL_SYMBOLS,
-            m_symbols[BROTLIG_LIT_TREE_INDEX],
-            m_codelens[BROTLIG_LIT_TREE_INDEX]
-        );
+            if (result != BROTLIG_OK)
+                return false;
 
+            // Load literal huffman table
+            result = LoadHuffmanTable(
+                m_pReader,
+                BROTLI_NUM_LITERAL_SYMBOLS,
+                m_symbols[BROTLIG_LIT_TREE_INDEX].get(),
+                m_codelens[BROTLIG_LIT_TREE_INDEX].get()
+            );
+
+            if (result != BROTLIG_OK)
+                return false;
+        }
         // Initialize distance ring buffer
         m_distring[0] = 4;
         m_distring[1] = 11;
@@ -199,9 +206,9 @@ bool PageDecoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
         BrotligCommand* cqfront = cmdQueue;
         BrotligCommand* cqback = cmdQueue;
 
-        uint8_t* litQueue = new uint8_t[m_params.page_size];
-        uint8_t* lqfront = litQueue;
-        uint8_t* lqback = litQueue;
+        std::unique_ptr litQueue = std::make_unique<uint8_t[]>(m_params.page_size);
+        uint8_t* lqfront = litQueue.get();
+        uint8_t* lqback = litQueue.get();
 
         uint32_t bs_processed = 0, num_bitstreams = (uint32_t)m_params.num_bitstreams, prev_tail = 0, litcount = 0, aclitcount = 0, mult = 0, rlitcount = 0;
         uint8_t* wPtr = p_outPtr;
@@ -273,8 +280,6 @@ bool PageDecoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
             cqfront = cqback = cmdQueue;
         }
 
-        delete[] litQueue;
-
         if (isDelta_Encoded) DeltaDecode(outputOffset, outputOffset + outputSize, p_outPtr);
     }
 
@@ -303,26 +308,6 @@ bool PageDecoder::Run(const uint8_t* input, size_t inputSize, size_t inputOffset
     }
 
     return true;
-}
-
-void PageDecoder::Cleanup()
-{
-    for (size_t i = 0; i < BROTLIG_NUM_HUFFMAN_TREES; ++i)
-    {
-        if (m_symbols[i] != nullptr)
-        {
-            delete m_symbols[i];
-            m_symbols[i] = nullptr;
-        }
-
-        if (m_codelens[i] != nullptr)
-        {
-            delete m_codelens[i];
-            m_codelens[i] = nullptr;
-        }
-    }
-
-    m_distring[0] = m_distring[1] = m_distring[2] = m_distring[3] = 0;
 }
 
 bool PageDecoder::DecodeCommand(BrotligCommand& cmd)
@@ -481,6 +466,12 @@ uint32_t PageDecoder::DeconditionBC1_5(uint32_t offsetAddr, uint32_t sub)
     return  (mipPos + blockPos + subblockPos + bytePos);
 }
 
+static void DeltaDecodeByte(size_t inSize, uint8_t* inData)
+{
+    for (size_t el = 1; el < inSize; ++el)
+        inData[el] += inData[el - 1];
+}
+
 void PageDecoder::DeltaDecode(size_t page_start, size_t page_end, uint8_t* data)
 {
     uint32_t sub = 0;
@@ -500,10 +491,4 @@ void PageDecoder::DeltaDecode(size_t page_start, size_t page_end, uint8_t* data)
             DeltaDecodeByte(p_sub_size, data + p_sub_start);
         }
     }
-}
-
-void PageDecoder::DeltaDecodeByte(size_t inSize, uint8_t* inData)
-{
-    for (size_t el = 1; el < inSize; ++el)
-        inData[el] += inData[el - 1];
 }

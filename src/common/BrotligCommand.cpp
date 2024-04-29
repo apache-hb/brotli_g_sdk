@@ -23,34 +23,14 @@
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
+extern "C" {
+#include "c/enc/command.h"
+}
+
 #include "common/BrotligCommand.h"
 #include "BrotligBitWriter.h"
 
 using namespace BrotliG;
-
-BrotligCommand::BrotligCommand()
-{
-    insert_pos = 0;
-    insert_len = 0;
-    copy_len = 0;
-    dist_extra = 0;
-    cmd_prefix = 0;
-    dist_prefix = 0;
-    dist = 0;
-    dist_code = 0;
-}
-
-Command* BrotligCommand::ToBroliCommand()
-{
-    Command* out = new Command;
-    out->insert_len_ = insert_len;
-    out->copy_len_ = copy_len;
-    out->cmd_prefix_ = cmd_prefix;
-    out->dist_prefix_ = dist_prefix;
-    out->dist_extra_ = dist_extra;
-
-    return out;
-}
 
 void BrotligCommand::Copy(Command* in)
 {
@@ -63,12 +43,12 @@ void BrotligCommand::Copy(Command* in)
     dist_code = 0;
 }
 
-uint32_t BrotligCommand::CopyLen()
+uint32_t BrotligCommand::CopyLen() const
 {
     return copy_len & 0x1FFFFFF;
 }
 
-uint32_t BrotligCommand::DistanceContext()
+uint32_t BrotligCommand::DistanceContext() const
 {
     uint32_t r = cmd_prefix >> 6;
     uint32_t c = cmd_prefix & 7;
@@ -78,19 +58,19 @@ uint32_t BrotligCommand::DistanceContext()
     return 3;
 }
 
-uint16_t BrotligCommand::Distance()
+uint16_t BrotligCommand::Distance() const
 {
     return dist_prefix & 0x3FF;
 }
 
-uint32_t BrotligCommand::CopyLenCode()
+uint32_t BrotligCommand::CopyLenCode() const
 {
     uint32_t modifier = copy_len >> 25;
     int32_t delta = (int8_t)((uint8_t)(modifier | ((modifier & 0x40) << 1)));
     return (uint32_t)((int32_t)(copy_len & 0x1FFFFFF) + delta);
 }
 
-uint16_t BrotligCommand::InsertLengthCode()
+uint16_t BrotligCommand::InsertLengthCode() const
 {
     if (insert_len < 6) {
         return (uint16_t)insert_len;
@@ -113,7 +93,7 @@ uint16_t BrotligCommand::InsertLengthCode()
     }
 }
 
-uint16_t BrotligCommand::GetCopyLengthCode(size_t copylen) {
+uint16_t BrotligCommand::GetCopyLengthCode(size_t copylen)  {
     if (copylen == 0) {
         return (uint16_t)(copylen);
     }
@@ -132,7 +112,7 @@ uint16_t BrotligCommand::GetCopyLengthCode(size_t copylen) {
     }
 }
 
-void BrotligCommand::GetExtra(uint32_t& n_bits, uint64_t& bits)
+void BrotligCommand::GetExtra(uint32_t& n_bits, uint64_t& bits) const
 {
     if (cmd_prefix <= BROTLI_NUM_COMMAND_SYMBOLS)
     {
@@ -155,7 +135,7 @@ void BrotligCommand::GetExtra(uint32_t& n_bits, uint64_t& bits)
     }
 }
 
-void BrotligCommand::StoreExtra(BrotligBitWriterLSB* bw)
+void BrotligCommand::StoreExtra(BrotligBitWriterLSB* bw) const
 {
     if (cmd_prefix <= BROTLI_NUM_COMMAND_SYMBOLS)
     {

@@ -25,13 +25,16 @@
 
 #pragma once
 
-
+extern "C" {
 #include "c/enc/command.h"
 #include "c/enc/hash.h"
-
 #include "brotli/encode.h"
+}
 
 #include "common/BrotligDataConditioner.h"
+#include "encoder/BrotligSwizzler.h"
+
+#include <memory>
 
 namespace BrotliG
 {
@@ -92,8 +95,7 @@ namespace BrotliG
     class PageEncoder
     {
     public:
-        PageEncoder();
-        ~PageEncoder();
+        PageEncoder() = default;
 
         static inline size_t MaxCompressedSize(size_t inputSize)
         {
@@ -102,7 +104,6 @@ namespace BrotliG
 
         bool Setup(BrotligEncoderParams& params, BrotligDataconditionParams* preconditioner);
         bool Run(const uint8_t* input, size_t inputSize, size_t inputOffset, uint8_t* output, size_t* outputSize, size_t outputOffset, bool isLast);
-        void Cleanup();
 
     private:
         bool DeltaEncode(size_t page_start, size_t page_end, uint8_t* input);
@@ -113,8 +114,7 @@ namespace BrotliG
         inline void StoreDistance(uint16_t dist, uint32_t distextra);
 
         BrotligEncoderParams m_params;
-        BrotligDataconditionParams* m_dcparams;
-        BrotligEncoderState* m_state;
+        BrotligDataconditionParams* m_dcparams = nullptr;
 
         uint32_t m_histCommands[BROLTIG_NUM_COMMAND_SYMBOLS_EFFECTIVE];
         uint32_t m_histLiterals[BROTLI_NUM_LITERAL_SYMBOLS];
@@ -129,6 +129,6 @@ namespace BrotliG
         uint16_t m_distCodes[BROTLIG_NUM_DISTANCE_SYMBOLS];
         uint8_t m_distCodelens[BROTLIG_NUM_DISTANCE_SYMBOLS];
 
-        BrotligSwizzler* m_pWriter;
+        std::unique_ptr<BrotligSwizzler> m_pWriter;
     };
 }

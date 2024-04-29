@@ -22,6 +22,7 @@
 
 #include "common/BrotligBitWriter.h"
 
+#include <memory>
 #include <vector>
 
 namespace BrotliG
@@ -32,8 +33,6 @@ namespace BrotliG
     {
     public:
         BrotligSwizzler(size_t num_bitstreams, size_t bssizes);
-
-        ~BrotligSwizzler();
 
         inline void AppendToHeader(uint32_t n, uint32_t bits)
         {
@@ -71,8 +70,8 @@ namespace BrotliG
         std::vector<uint8_t> m_headerStream;
         std::vector<std::vector<uint8_t>> m_bitstreams;
 
-        BrotligBitWriterLSB* m_headerWriter;
-        std::vector<BrotligBitWriterLSB*> m_writers;
+        std::unique_ptr<BrotligBitWriterLSB> m_headerWriter;
+        std::vector<std::unique_ptr<BrotligBitWriterLSB>> m_writers;
 
         BrotligBitWriterLSB* m_outWriter;
         size_t m_outSize;
