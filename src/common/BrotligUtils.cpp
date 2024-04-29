@@ -23,8 +23,10 @@
    See file LICENSE for detail or copy at https://opensource.org/licenses/MIT
 */
 
-#define NOMINMAX
-#include <windows.h>
+#ifdef _WIN32
+#   define NOMINMAX
+#   include <windows.h>
+#endif
 
 #include <cassert>
 #include <fstream>
