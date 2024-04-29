@@ -26,10 +26,10 @@
 #include <cassert>
 #include <queue>
 
-#include "BrotligSwizzler.h"
 #include "common/BrotligConstants.h"
 #include "common/BrotligUtils.h"
 
+#include "BrotligSwizzler.h"
 #include "BrotligHuffman.h"
 
 using namespace BrotliG;
@@ -255,7 +255,7 @@ static void StoreComplexHuffman(uint16_t codes[], uint8_t codelens[], size_t alp
     }
 }
 
-void BrotliG::BuildStoreHuffmanTable(
+BROTLIG_ERROR BrotliG::BuildStoreHuffmanTable(
     uint32_t* hist,
     size_t alphabet_size,
     BrotligSwizzler& writer,
@@ -300,7 +300,7 @@ void BrotliG::BuildStoreHuffmanTable(
         codelens[s4[0]] = 0;
 
         writer.BSReset();
-        return;
+        return BROTLIG_OK;
     }
 
     BuildHuffman(hist, alphabet_size, codes, codelens);
@@ -341,7 +341,7 @@ void BrotliG::BuildStoreHuffmanTable(
             writer.Append((uint32_t)max_bits, (uint32_t)s4[3], true);
             break;
         default:
-            throw std::exception("Incorrect num symbols for simple huffman tree.");
+            return BROTLIG_ERROR_HUFFMAN_TREE_SYMBOL_COUNT;
         }
 
         writer.BSReset();
@@ -354,4 +354,6 @@ void BrotliG::BuildStoreHuffmanTable(
 
         writer.BSReset();
     }
+
+    return BROTLIG_OK;
 }
