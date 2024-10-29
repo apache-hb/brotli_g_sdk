@@ -33,5 +33,5 @@ namespace BrotliG
 
     BROTLIG_ERROR BROTLIG_API CheckParams(uint32_t page_size, BrotligDataconditionParams dcParams);
 
-    BROTLIG_ERROR BROTLIG_API Encode(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t** output, uint32_t page_size, BrotligDataconditionParams dcParams, BROTLIG_Feedback_Proc feedbackProc);
+    BROTLIG_ERROR BROTLIG_API Encode(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t*& output, uint32_t page_size, BrotligDataconditionParams dcParams, BROTLIG_Feedback_Proc feedbackProc);
 }
