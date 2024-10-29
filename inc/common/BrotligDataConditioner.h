@@ -21,6 +21,7 @@
 
 #include "BrotligConstants.h"
 #include "BrotligCommon.h"
+#include <memory>
 
 namespace BrotliG
 {
@@ -65,6 +66,5 @@ namespace BrotliG
         bool Initialize(uint32_t inSize);
     };
 
-    [[nodiscard]]
-    bool Condition(uint32_t inSize, const uint8_t* inData, BrotligDataconditionParams& params, uint32_t& outSize, uint8_t*& outData);
+    std::unique_ptr<uint8_t[]> Condition(uint32_t inSize, const uint8_t* inData, BrotligDataconditionParams& params, uint32_t& outSize);
 }

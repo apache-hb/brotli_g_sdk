@@ -72,17 +72,17 @@ static BROTLIG_ERROR EncodeWithPreconSinglethreaded(
     BROTLIG_Feedback_Proc feedbackProc
 )
 {
-    uint8_t* srcConditioned = nullptr;
     uint32_t srcCondSize = 0;
+    std::unique_ptr<uint8_t[]> srcConditioned = BrotliG::Condition(input_size, src, dcParams, srcCondSize);
 
-    if (!BrotliG::Condition(input_size, src, dcParams, srcCondSize, srcConditioned))
+    if (!srcConditioned)
         return BROTLIG_ERROR_PRECON_INCORRECT_FORMAT;
 
     uint32_t numPages = (srcCondSize + page_size - 1) / page_size;
 
     size_t maxOutPageSize = PageEncoder::MaxCompressedSize(page_size);
-    uint8_t *tOutput = new uint8_t[maxOutPageSize * numPages];
-    size_t* tOutpageSizes = new size_t[numPages];
+    std::unique_ptr<uint8_t[]> tOutput = std::make_unique<uint8_t[]>(maxOutPageSize * numPages);
+    std::unique_ptr<size_t[]> tOutpageSizes = std::make_unique<size_t[]>(numPages);
 
     std::vector<size_t> outputPageSize(numPages);
 
@@ -97,8 +97,8 @@ static BROTLIG_ERROR EncodeWithPreconSinglethreaded(
 
     uint32_t pageIndex = 0;
     uint32_t sizeLeftToRead = srcCondSize, sizeToRead = 0, curInOffset = 0, curOutOffset = 0;
-    uint8_t* srcPtr = srcConditioned;
-    uint8_t* outPtr = tOutput;
+    uint8_t* srcPtr = srcConditioned.get();
+    uint8_t* outPtr = tOutput.get();
 
     while (pageIndex < numPages) {
         sizeToRead = (sizeLeftToRead > page_size) ? page_size : sizeLeftToRead;
@@ -158,7 +158,7 @@ static BROTLIG_ERROR EncodeWithPreconSinglethreaded(
     size_t tablesize = numPages * sizeof(uint32_t);
     outPtr += tablesize;
     tcompressedSize += tablesize;
-    srcPtr = tOutput;
+    srcPtr = tOutput.get();
     curInOffset = 0, curOutOffset = 0;
 
     for (size_t pindex = 0; pindex < numPages; ++pindex)
@@ -171,10 +171,6 @@ static BROTLIG_ERROR EncodeWithPreconSinglethreaded(
     }
 
     pageTable[0] = (uint32_t)tOutpageSizes[numPages - 1];
-
-    delete[] tOutpageSizes;
-    delete[] tOutput;
-    delete[] srcConditioned;
 
     *output_size = (uint32_t)tcompressedSize;
 
@@ -194,8 +190,8 @@ static BROTLIG_ERROR EncodeNoPreconSinglethreaded(
     uint32_t numPages = (input_size + page_size - 1) / page_size;
 
     size_t maxOutPageSize = PageEncoder::MaxCompressedSize(page_size);
-    uint8_t* tOutput = new uint8_t[maxOutPageSize * numPages];
-    size_t* tOutpageSizes = new size_t[numPages];
+    std::unique_ptr<uint8_t[]> tOutput = std::make_unique<uint8_t[]>(maxOutPageSize * numPages);
+    std::unique_ptr<size_t[]> tOutpageSizes = std::make_unique<size_t[]>(numPages);
 
     std::vector<size_t> outputPageSize(numPages);
 
@@ -213,7 +209,7 @@ static BROTLIG_ERROR EncodeNoPreconSinglethreaded(
     uint32_t pageIndex = 0;
     uint32_t sizeLeftToRead = input_size, sizeToRead = 0, curInOffset = 0, curOutOffset = 0;
 
-    uint8_t* outPtr = tOutput;
+    uint8_t* outPtr = tOutput.get();
 
     while (pageIndex < numPages) {
 
@@ -257,7 +253,7 @@ static BROTLIG_ERROR EncodeNoPreconSinglethreaded(
     size_t tablesize = numPages * sizeof(uint32_t);
     outPtr += tablesize;
     tcompressedSize += tablesize;
-    srcPtr = tOutput;
+    srcPtr = tOutput.get();
     curInOffset = 0, curOutOffset = 0;
 
     for (size_t pindex = 0; pindex < numPages; ++pindex)
@@ -270,9 +266,6 @@ static BROTLIG_ERROR EncodeNoPreconSinglethreaded(
     }
 
     pageTable[0] = (uint32_t)tOutpageSizes[numPages - 1];
-
-    delete[] tOutpageSizes;
-    delete[] tOutput;
 
     *output_size = (uint32_t)tcompressedSize;
 
@@ -339,8 +332,8 @@ struct PageEncoderCtx
     uint32_t numPages = 0;
     uint32_t lastPageSize = 0;
 
-    uint8_t* outputPtr = nullptr;
-    size_t* outPageSizes = nullptr;
+    std::unique_ptr<uint8_t[]> outputPtr;
+    std::unique_ptr<size_t[]> outPageSizes;
     const uint8_t* inputPtr = nullptr;
 
     BROTLIG_Feedback_Proc feedbackProc = nullptr;
@@ -349,8 +342,8 @@ struct PageEncoderCtx
         : maxOutPageSize(BrotliG::MaxCompressedSize(page_size))
         , numPages((input_size + page_size - 1) / page_size)
         , lastPageSize(input_size - ((numPages - 1) * page_size))
-        , outputPtr(new uint8_t[maxOutPageSize * numPages])
-        , outPageSizes(new size_t[numPages])
+        , outputPtr(std::make_unique<uint8_t[]>(maxOutPageSize * numPages))
+        , outPageSizes(std::make_unique<size_t[]>(numPages))
         , inputPtr(input_ptr)
         , feedbackProc(feedback)
     { }
@@ -376,7 +369,7 @@ static void PageEncoderJob(PageEncoderCtx& ctx, BrotligEncoderParams& params, Br
         curOutOffset = pageIndex * ctx.maxOutPageSize;
         ctx.outPageSizes[pageIndex] = ctx.maxOutPageSize;
 
-        pEncoder.Run(ctx.inputPtr, inPageSize, curInOffset, ctx.outputPtr, &ctx.outPageSizes[pageIndex], curOutOffset, (pageIndex == ctx.numPages - 1));
+        pEncoder.Run(ctx.inputPtr, inPageSize, curInOffset, ctx.outputPtr.get(), &ctx.outPageSizes[pageIndex], curOutOffset, (pageIndex == ctx.numPages - 1));
 
         if (ctx.feedbackProc)
         {
@@ -399,13 +392,13 @@ static BROTLIG_ERROR EncodeWithPreconMultithreaded(
     BROTLIG_Feedback_Proc feedbackProc
 )
 {
-    uint8_t* srcConditioned = nullptr;
     uint32_t srcCondSize = 0;
+    std::unique_ptr<uint8_t[]> srcConditioned = BrotliG::Condition(input_size, src, dcParams, srcCondSize);
 
-    if (!BrotliG::Condition(input_size, src, dcParams, srcCondSize, srcConditioned))
+    if (!srcConditioned)
         return BROTLIG_ERROR_INCORRECT_STREAM_FORMAT;
 
-    PageEncoderCtx ctx{page_size, srcCondSize, srcConditioned, feedbackProc};
+    PageEncoderCtx ctx{page_size, srcCondSize, srcConditioned.get(), feedbackProc};
 
     BrotligEncoderParams params = {
         BROTLI_MAX_QUALITY,
@@ -469,7 +462,7 @@ static BROTLIG_ERROR EncodeWithPreconMultithreaded(
     size_t tablesize = ctx.numPages * sizeof(uint32_t);
     outPtr += tablesize;
     tcompressedSize += tablesize;
-    const uint8_t* srcPtr = ctx.outputPtr;
+    const uint8_t* srcPtr = ctx.outputPtr.get();
     uint32_t curInOffset = 0, curOutOffset = 0;
 
     for (size_t pindex = 0; pindex < ctx.numPages; ++pindex)
@@ -482,10 +475,6 @@ static BROTLIG_ERROR EncodeWithPreconMultithreaded(
     }
 
     pageTable[0] = (uint32_t)ctx.outPageSizes[ctx.numPages - 1];
-
-    delete[] ctx.outPageSizes;
-    delete[] ctx.outputPtr;
-    delete[] srcConditioned;
 
     *output_size = (uint32_t)tcompressedSize;
 
@@ -513,8 +502,7 @@ static BROTLIG_ERROR EncodeNoPreconMultithreaded(
 
     const uint32_t maxWorkers = std::min(static_cast<unsigned int>(BROTLIG_MAX_WORKERS), BrotliG::GetNumberOfProcessorsThreads());
 
-    std::vector<std::thread> workers;
-
+    std::thread workers[BROTLIG_MAX_WORKERS];
     uint32_t numWorkersLeft = (ctx.numPages > 2 * maxWorkers) ? maxWorkers : 1;
     for (auto& worker : workers)
     {
@@ -551,7 +539,7 @@ static BROTLIG_ERROR EncodeNoPreconMultithreaded(
     size_t tablesize = ctx.numPages * sizeof(uint32_t);
     outPtr += tablesize;
     tcompressedSize += tablesize;
-    const uint8_t* srcPtr = ctx.outputPtr;
+    const uint8_t* srcPtr = ctx.outputPtr.get();
     uint32_t curInOffset = 0, curOutOffset = 0;
 
     for (size_t pindex = 0; pindex < ctx.numPages; ++pindex)
@@ -564,9 +552,6 @@ static BROTLIG_ERROR EncodeNoPreconMultithreaded(
     }
 
     pageTable[0] = (uint32_t)ctx.outPageSizes[ctx.numPages - 1];
-
-    delete[] ctx.outPageSizes;
-    delete[] ctx.outputPtr;
 
     *output_size = (uint32_t)tcompressedSize;
 

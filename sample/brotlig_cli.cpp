@@ -156,18 +156,16 @@ std::unique_ptr<uint8_t[]> ReadBinaryFile(const std::string& filepath, uint32_t*
 }
 
 // Write a binary file
-bool WriteBinaryFile(std::string filepath, uint8_t* content, uint32_t size)
+void WriteBinaryFile(const std::string& filepath, uint8_t* content, uint32_t size)
 {
     std::ofstream ofs(filepath, std::ios::out | std::ios::binary);
 
     if (!ofs.is_open())
-        return false;
+        throw std::runtime_error("Failed to write to file: " + filepath);
 
     ofs.write(reinterpret_cast<char*>(content), static_cast<std::streamsize>(size));
 
     ofs.close();
-
-    return true;
 }
 
 void PrintCommandLineSyntax()
@@ -469,8 +467,7 @@ int main(int argc, char* argv[])
                 }
 
                 printf("Saving decompressed file %s\n", dstFilePath.c_str());
-                if (!WriteBinaryFile(dstFilePath, output_data, output_size))
-                    throw std::exception("File Not Saved.");
+                WriteBinaryFile(dstFilePath, output_data, output_size);
             }
             else {
 
@@ -521,8 +518,7 @@ int main(int argc, char* argv[])
                 }
 
                 printf("\nSaving compressed file %s\n", dstFilePath.c_str());
-                if (!WriteBinaryFile(dstFilePath, output_data, output_size))
-                    throw std::exception("File Not Saved.");
+                WriteBinaryFile(dstFilePath, output_data, output_size);
                 isCompressed = true;
             }
         }
@@ -570,9 +566,7 @@ int main(int argc, char* argv[])
 
                 // Save the uncompressed file
                 printf("\nSaving decompressed file %s\n", dstFilePath.c_str());
-                if (!WriteBinaryFile(dstFilePath, output_data, output_size))
-                    throw std::exception("File Not Saved.");
-
+                WriteBinaryFile(dstFilePath, output_data, output_size);
             }
             else {
 
@@ -587,7 +581,7 @@ int main(int argc, char* argv[])
                 src_data = ReadBinaryFile(srcFilePath, &src_size);
 
                 size_t output_sizet = BrotliEncoderMaxCompressedSize(src_size);
-                uint8_t* output_data = new uint8_t[output_sizet];
+                std::unique_ptr<uint8_t[]> output_data = std::make_unique<uint8_t[]>(output_sizet);
 
                 uint32_t rep = 0;
                 while (rep != pParams.num_repeat)
@@ -600,7 +594,7 @@ int main(int argc, char* argv[])
                         src_size,
                         src_data.get(),
                         &output_sizet,
-                        output_data))
+                        output_data.get()))
                     {
                         throw std::exception("Brotli Encoder Failed or Aborted.");
                     }
@@ -612,8 +606,7 @@ int main(int argc, char* argv[])
                 }
 
                 printf("\nSaving compressed file %s\n", dstFilePath.c_str());
-                if (!WriteBinaryFile(dstFilePath, output_data, output_size))
-                    throw std::exception("File Not Saved.");
+                WriteBinaryFile(dstFilePath, output_data.get(), output_size);
                 isCompressed = true;
             }
         }

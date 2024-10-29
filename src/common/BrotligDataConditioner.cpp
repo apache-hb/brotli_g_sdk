@@ -64,14 +64,13 @@ static bool Swizzle(uint32_t size, uint8_t* data, uint32_t blockSize, uint32_t w
     return true;
 }
 
-static void ConditionBC1_5(uint32_t inSize, const uint8_t* inData, BrotliG::BrotligDataconditionParams& params, uint32_t& outSize, uint8_t*& outData)
+static std::unique_ptr<uint8_t[]> ConditionBC1_5(uint32_t inSize, const uint8_t* inData, BrotliG::BrotligDataconditionParams& params, uint32_t& outSize)
 {
     std::unique_ptr temp = std::make_unique<uint8_t[]>(inSize);
     memcpy(temp.get(), inData, inSize);
 
     outSize = inSize;
-    outData = new uint8_t[outSize];
-    memset(outData, 0, outSize);
+    std::unique_ptr<uint8_t[]> outData = std::make_unique<uint8_t[]>(outSize);
 
     if (params.swizzle)
     {
@@ -110,6 +109,8 @@ static void ConditionBC1_5(uint32_t inSize, const uint8_t* inData, BrotliG::Brot
             }
         }
     }
+
+    return outData;
 }
 
 BROTLIG_ERROR BrotliG::BrotligDataconditionParams::CheckParams() const
@@ -288,7 +289,7 @@ bool BrotliG::BrotligDataconditionParams::Initialize(uint32_t inSize)
     return true;
 }
 
-bool BrotliG::Condition(uint32_t inSize, const uint8_t* inData, BrotligDataconditionParams& params, uint32_t& outSize, uint8_t*& outData)
+std::unique_ptr<uint8_t[]> BrotliG::Condition(uint32_t inSize, const uint8_t* inData, BrotligDataconditionParams& params, uint32_t& outSize)
 {
     switch (params.format)
     {
@@ -297,9 +298,8 @@ bool BrotliG::Condition(uint32_t inSize, const uint8_t* inData, BrotligDatacondi
     case BROTLIG_DATA_FORMAT_BC3:
     case BROTLIG_DATA_FORMAT_BC4:
     case BROTLIG_DATA_FORMAT_BC5:
-        ConditionBC1_5(inSize, inData, params, outSize, outData);
-        return true;
+        return ConditionBC1_5(inSize, inData, params, outSize);
     default:
-        return false;
+        return nullptr;
     }
 }
