@@ -29,21 +29,9 @@
 
 namespace BrotliG
 {
-#ifdef __cplusplus
-    extern "C"
-    {
-#endif // __cplusplus
+    uint32_t BROTLIG_API MaxCompressedSize(uint32_t inputSize, bool precondition = false, bool deltaencode = false);
 
-        [[nodiscard]]
-        uint32_t BROTLIG_API MaxCompressedSize(uint32_t inputSize, bool precondition = false, bool deltaencode = false);
+    BROTLIG_ERROR BROTLIG_API CheckParams(uint32_t page_size, BrotligDataconditionParams dcParams);
 
-        [[nodiscard]]
-        BROTLIG_ERROR BROTLIG_API CheckParams(uint32_t page_size, BrotligDataconditionParams dcParams);
-
-        [[nodiscard]]
-        BROTLIG_ERROR BROTLIG_API Encode(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t*& output, uint32_t page_size, BrotligDataconditionParams dcParams, BROTLIG_Feedback_Proc feedbackProc);
-
-#ifdef __cplusplus
-    };
-#endif // __cplusplus
+    BROTLIG_ERROR BROTLIG_API Encode(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t** output, uint32_t page_size, BrotligDataconditionParams dcParams, BROTLIG_Feedback_Proc feedbackProc);
 }

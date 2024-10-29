@@ -50,8 +50,6 @@ extern "C" {
 
 #include "PageEncoder.h"
 
-#define MAX(a, b) ((a > b) ? a : b)
-#define MIN(a, b) ((a < b) ? a : b)
 #define OVERLAP(x1, x2, y1, y2) (x1 < y2 && y1 < x2)
 
 using namespace BrotliG;

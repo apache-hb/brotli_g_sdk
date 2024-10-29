@@ -16,6 +16,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
+
 #pragma once
 
 // IWYU pragma: begin_exports
@@ -29,16 +30,7 @@
 
 namespace BrotliG
 {
-#ifdef __cplusplus
-    extern "C"
-    {
-#endif // __cplusplus
-        [[nodiscard]]
-        uint32_t BROTLIG_API DecompressedSize(uint8_t* src);
+    uint32_t BROTLIG_API DecompressedSize(uint8_t* src);
 
-        [[nodiscard]]
-        BROTLIG_ERROR BROTLIG_API DecodeCPU(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t* output, BROTLIG_Feedback_Proc feedbackProc);
-#ifdef __cplusplus
-    };
-#endif // __cplusplus
+    BROTLIG_ERROR BROTLIG_API DecodeCPU(uint32_t input_size, const uint8_t* src, uint32_t* output_size, uint8_t* output, BROTLIG_Feedback_Proc feedbackProc);
 }

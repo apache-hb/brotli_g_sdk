@@ -1,5 +1,5 @@
 // Brotli-G SDK 1.1
-// 
+//
 // Copyright(c) 2022 - 2024 Advanced Micro Devices, Inc. All rights reserved.
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files(the "Software"), to deal
@@ -87,7 +87,7 @@ namespace BrotliG
     };
 
     struct PreconditionHeader
-    {        
+    {
         uint32_t Swizzled               : BROTLIG_PRECON_SWIZZLING_BITS;
         uint32_t PitchD3D12Aligned      : BROTLIG_PRECON_PITCH_D3D12_ALIGNED_FLAG_BITS;
         uint32_t WidthInBlocks          : BROTLIG_PRECON_TEX_WIDTH_BLOCK_BITS;
@@ -107,4 +107,3 @@ namespace BrotliG
         }
     };
 }
-

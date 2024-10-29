@@ -1,10 +1,12 @@
 project('brotli_g_sdk', 'cpp',
     version : '1.1.0',
     default_options : [
-        'cpp_std=c++17'
+        'cpp_std=c++17',
+        'default_library=static',
     ],
     license : 'LicenseRef-Proprietary',
-    license_files : [ 'LICENSE.txt' ]
+    license_files : [ 'LICENSE.txt' ],
+    meson_version : '>=1.1.0'
 )
 
 cpp = meson.get_compiler('cpp')
@@ -36,7 +38,7 @@ inc = include_directories('inc', 'inc/common', 'inc/decoder', 'inc/encoder')
 shader = files('src/decoder/BrotliGCompute.hlsl')
 
 libbrotlig = library('brotli_g_sdk', src,
-    include_directories : inc,
+    include_directories : [ inc ],
     dependencies : [ common, encode, decode ],
     extra_files : shader,
     cpp_args : [ '-D_HAS_EXCEPTIONS=0' ],

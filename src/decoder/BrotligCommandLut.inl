@@ -29,14 +29,14 @@
 
 namespace BrotliG
 {
-    typedef struct BrotligCmdLutElement {
+    struct BrotligCmdLutElement {
         uint32_t insert_len_extra_bits;
         uint32_t copy_len_extra_bits;
         int32_t distance_code;
         uint32_t context;
         uint32_t insert_len_offset;
         uint32_t copy_len_offset;
-    } BrotligCmdLutElement;
+    };
 
     static const BrotligCmdLutElement sBrotligCmdLut[BROTLIG_NUM_COMMAND_SYMBOLS_WITH_SENTINEL] = {
       { 0, 0, 0, 0, 0, 2 },

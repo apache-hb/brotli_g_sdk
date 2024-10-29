@@ -17,10 +17,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#ifndef _BROTLIG_H_7196D7AB_0709_4C90_9822_DF5DD5D96EF7
-#define _BROTLIG_H_7196D7AB_0709_4C90_9822_DF5DD5D96EF7
-
-#include <stdint.h>
+#pragma once
 
 // IWYU pragma: begin_exports
 
@@ -28,5 +25,3 @@
 #include "BrotligDecoder.h"
 
 // IWYU pragma: end_exports
-
-#endif
