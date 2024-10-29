@@ -131,12 +131,12 @@ inline void RemoveExtension(std::string& srcString, const std::string& extension
 }
 
 // Read a binary file
-bool ReadBinaryFile(std::string filepath, uint8_t* & content, uint32_t* size)
+std::unique_ptr<uint8_t[]> ReadBinaryFile(const std::string& filepath, uint32_t* size)
 {
     std::ifstream ifs(filepath, std::ios::in | std::ios::binary);
 
     if (!ifs.is_open())
-        return false;
+        throw std::runtime_error("Failed to open file: " + filepath);
 
     auto start = ifs.tellg();
     ifs.seekg(0, std::ios::end);
@@ -144,15 +144,15 @@ bool ReadBinaryFile(std::string filepath, uint8_t* & content, uint32_t* size)
     ifs.seekg(0, std::ios::beg);
     uint32_t fsize = static_cast<uint32_t>(end - start);
 
-    content = new uint8_t[fsize];
+    std::unique_ptr<uint8_t[]> content = std::make_unique<uint8_t[]>(fsize);
 
-    ifs.read(reinterpret_cast<char*>(content), static_cast<std::streamsize>(fsize));
+    ifs.read(reinterpret_cast<char*>(content.get()), static_cast<std::streamsize>(fsize));
 
     ifs.close();
 
     *size = fsize;
 
-    return true;
+    return content;
 }
 
 // Write a binary file
@@ -391,7 +391,7 @@ int main(int argc, char* argv[])
         printf("Processing %s\n", srcFilePath.c_str());
 
         uint32_t src_size = 0;
-        uint8_t* src_data = nullptr;
+        std::unique_ptr<uint8_t[]> src_data;
         uint32_t output_size = 0;
         uint8_t* output_data = nullptr;
         double   deltaTime = 0.0;
@@ -416,11 +416,10 @@ int main(int argc, char* argv[])
                     RemoveExtension(dstFilePath, BROTLIG_FILE_EXTENSION);
                 }
 
-                if (!ReadBinaryFile(srcFilePath, src_data, &src_size))
-                    throw std::exception("File Not Found.");
+                src_data = ReadBinaryFile(srcFilePath, &src_size);
 
                 // DeCompress the data
-                output_size = BrotliG::DecompressedSize(src_data);
+                output_size = BrotliG::DecompressedSize(src_data.get());
                 output_data = new uint8_t[output_size];
 #ifdef USE_GPU_DECOMPRESSION
                 if (pParams.use_gpu)
@@ -437,7 +436,7 @@ int main(int argc, char* argv[])
                         printf("Round %d of %d\n", rep + 1, pParams.num_repeat);
                         double observedTime = 0.0;
 
-                        if (DecodeGPU(pParams.use_warp, src_size, src_data, &output_size, output_data, observedTime) != BROTLIG_OK)
+                        if (DecodeGPU(pParams.use_warp, src_size, src_data.get(), &output_size, output_data, observedTime) != BROTLIG_OK)
                             throw std::exception("BrotliG GPU Decoder Failed or Aborted.");
 
                         deltaTime += observedTime;
@@ -459,7 +458,7 @@ int main(int argc, char* argv[])
                         printf("Round %d of %d\n", rep + 1, pParams.num_repeat);
                         auto start = std::chrono::high_resolution_clock::now();
 
-                        if (BrotliG::DecodeCPU(src_size, src_data, &output_size, output_data, pParams.verbose ? processFeedback : nullptr) != BROTLIG_OK)
+                        if (BrotliG::DecodeCPU(src_size, src_data.get(), &output_size, output_data, pParams.verbose ? processFeedback : nullptr) != BROTLIG_OK)
                             throw std::exception("BrotliG CPU Decoder Failed or Aborted.");
 
                         auto end = std::chrono::high_resolution_clock::now();
@@ -489,8 +488,7 @@ int main(int argc, char* argv[])
                 dstFilePath = srcFilePath;
                 dstFilePath.append(BROTLIG_FILE_EXTENSION);
 
-                if (!ReadBinaryFile(srcFilePath, src_data, &src_size))
-                    throw std::exception("File Not Found.");
+                src_data = ReadBinaryFile(srcFilePath, &src_size);
 
                 output_size = BrotliG::MaxCompressedSize(src_size);
                 output_data = new uint8_t[output_size];
@@ -514,7 +512,7 @@ int main(int argc, char* argv[])
                 {
                     printf("Round %d of %d\n", rep + 1, pParams.num_repeat);
                     auto start = std::chrono::high_resolution_clock::now();
-                    if (BrotliG::Encode(src_size, src_data, &output_size, output_data, pParams.page_size, dcParams, pParams.verbose ? processFeedback : nullptr) != BROTLIG_OK)
+                    if (BrotliG::Encode(src_size, src_data.get(), &output_size, output_data, pParams.page_size, dcParams, pParams.verbose ? processFeedback : nullptr) != BROTLIG_OK)
                         throw std::exception("BrotliG Encoder Failed or Aborted.");
                     auto end = std::chrono::high_resolution_clock::now();
 
@@ -545,8 +543,7 @@ int main(int argc, char* argv[])
                     RemoveExtension(dstFilePath, BROTLI_FILE_EXTENSION);
                 }
 
-                if (!ReadBinaryFile(srcFilePath, src_data, &src_size))
-                    throw std::exception("File Not Found.");
+                src_data = ReadBinaryFile(srcFilePath, &src_size);
 
                 // DeCompress the data
                 size_t output_sizet = (size_t)pParams.brotli_decode_output_size;
@@ -557,7 +554,7 @@ int main(int argc, char* argv[])
                 {
                     printf("Round %d of %d\n", rep + 1, pParams.num_repeat);
                     auto start = std::chrono::high_resolution_clock::now();
-                    BrotliDecoderResult result = BrotliDecoderDecompress(src_size, src_data, &output_sizet, output_data);
+                    BrotliDecoderResult result = BrotliDecoderDecompress(src_size, src_data.get(), &output_sizet, output_data);
                     auto end = std::chrono::high_resolution_clock::now();
 
                     if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT)
@@ -587,8 +584,7 @@ int main(int argc, char* argv[])
                 dstFilePath = srcFilePath;
                 dstFilePath.append(BROTLI_FILE_EXTENSION);
 
-                if (!ReadBinaryFile(srcFilePath, src_data, &src_size))
-                    throw std::exception("File Not Found.");
+                src_data = ReadBinaryFile(srcFilePath, &src_size);
 
                 size_t output_sizet = BrotliEncoderMaxCompressedSize(src_size);
                 uint8_t* output_data = new uint8_t[output_sizet];
@@ -602,7 +598,7 @@ int main(int argc, char* argv[])
                         pParams.brotli_lgwin,
                         BROTLI_DEFAULT_MODE,
                         src_size,
-                        src_data,
+                        src_data.get(),
                         &output_sizet,
                         output_data))
                     {
@@ -638,7 +634,6 @@ int main(int argc, char* argv[])
             printf("Compression Ratio : %.2f\n", compression_ratio);
 
         if (output_data != nullptr)  delete[](output_data);
-        if (src_data != nullptr) delete[](src_data);
     }
     catch (const std::exception& ex)
     {
